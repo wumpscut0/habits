@@ -14,7 +14,7 @@ bot = Bot(getenv('TOKEN'))
 
 @dispatcher.message(CommandStart())
 async def open_menu(message: Message):
-    await message.answer('Congratulation! You configurated elephant and whale and you understand poetry')
+    await message.answer('Congratulation! You configurated elephant, whale, poetry, arch')
 
 
 async def main():
