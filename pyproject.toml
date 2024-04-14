@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "habits"
+version = "0.1.0"
+description = "psyshology service"
+authors = ["wumpscut0"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+alembic = "^1.13.1"
+fastapi = "^0.110.1"
+PyJWT = "^2.8.0"
+APScheduler = "^3.10.4"
+aiogram = "^3.4.1"
+redis = "^5.0.3"
+python-dotenv = "^1.0.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
