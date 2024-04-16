@@ -1,0 +1,1 @@
+redis postgresql docker poetry
