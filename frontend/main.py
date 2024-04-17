@@ -5,8 +5,11 @@ from aiogram.types import Message
 
 from frontend import bot
 from frontend.interface import authorization_router
+from frontend.middlewares import CommonMiddleware
+
 abyss = Router()
 dispatcher = Dispatcher(storage=RedisStorage(Redis()))
+dispatcher.update(CommonMiddleware())
 dispatcher.include_routers(
     authorization_router,
     abyss,

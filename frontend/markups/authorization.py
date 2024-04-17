@@ -1,4 +1,4 @@
-from frontend.markups import Markup
+from frontend.markups import Markup, ButtonWidget
 
 
 class Authorization(Markup):
@@ -6,10 +6,10 @@ class Authorization(Markup):
         super().__init__()
         self._header = '🧠 Psychological service'
         self._markup_map = [
-            [
-                {"mark": "🔐 ", "text": "Login", "callback_data": "authorization_login"}
-            ],
-            [
-                {"mark": "🔓🔑 ", "text": "Sign in", "callback_data": "sign_in"}
-            ]
+            {
+                "login": ButtonWidget("🔐 Login", "authorization_login")
+            },
+            {
+                "sign_in": ButtonWidget("🔓🔑 Sign in", "sign_in")
+            }
         ]

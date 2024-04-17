@@ -2,12 +2,12 @@ import os
 import re
 import aiohttp
 import jwt
-from aiogram.filters.callback_data import CallbackData
 from aiogram.utils.formatting import Bold, Italic
+from aiohttp import ClientSession
 from zxcvbn import zxcvbn
 from passlib.hash import pbkdf2_sha256
-from config import PASSWORD_LENGTH
-from frontend.markups import Markup
+from frontend.markups import Markup, TextWidget, ButtonWidget, CommonButtons, CommonTexts
+from config import *
 
 
 class Nickname(Markup):
@@ -16,14 +16,14 @@ class Nickname(Markup):
         self._nickname = None
 
         self._header = "Choose the nickname"
-        self._text_map = [
-            {"mark": "", "header": Bold(f"Nickname: "), "data": "❔"},
-            {"mark": "", "header": Bold(f"Feedback: "), "data": "❔"},
-        ]
+        self._text_map = {
+            'nickname': TextWidget(Bold("🪪 Nickname")),
+            'feedback': CommonTexts.feedback(),
+        }
         self._markup_map = [
-            [
-                {"mark": "✅ ", "text": "Accept", "callback_data": "sign_in"}
-            ],
+            {
+                'accept': CommonButtons.accept('sign_in')
+            },
         ]
 
     @property
@@ -32,16 +32,15 @@ class Nickname(Markup):
 
     async def update_nickname(self, nickname):
         if not re.fullmatch(r'\w{3,10}', nickname, flags=re.I):
-            await self._update_text({
-                0: {'data': "❔"},
-                1: {"data": Italic("Nickname must contains only latin symbols or signs '_' or digits.")}
-            })
+            await self._text_map['feedback'].update_text(
+                data=Italic(f"Nickname {nickname} not allowed."
+                            " Nickname must contains only latin symbols or signs '_' or digits."),
+                mark=DENIAL
+            )
         else:
             self._nickname = nickname
-            await self._update_text({
-                0: {'data': Italic(nickname)},
-                1: {"data": Italic("Nickname allowed")}
-            })
+            await self._text_map['nickname'].update_text(data=Italic(nickname))
+            await self._text_map['feedback'].update_text(data=Italic("Nickname allowed"), mark=OK)
 
 
 class Login(Markup):
@@ -50,40 +49,37 @@ class Login(Markup):
         self._login = None
 
         self._header = 'Choose the login'
-        self._text_map = [
-            {"mark": "", "header": Bold(f"Login: "), "data": "❔"},
-        ]
+        self._text_map = {
+            "login": TextWidget('🆔 Login'),
+            "feedback": CommonTexts.feedback()
+        }
         self._markup_map = [
-            [
-                {"mark": "✅ ", "text": "Accept", "callback_data": "sign_in"},
-            ],
+            {
+                "accept": CommonButtons.accept('sign_in')
+            },
         ]
 
     @property
     def login(self):
         return self._login
 
-    async def update_login(self, login):
+    async def update_login(self, login, session: ClientSession):
         if not re.fullmatch(r'\w{3,10}', login, flags=re.I):
-            await self._update_text({
-                0: {'data': "❔"},
-                1: {"data": Italic("Login must contains only latin symbols or signs '_' or digits.")}
-            })
+            await self._text_map['feedback'].update_text(
+                data=Bold("Login must contains only latin symbols or signs '_' or digits."),
+                mark=DENIAL
+            )
         else:
-            async with aiohttp.ClientSession as session:
-                async with session.get(os.getenv('BACKEND') + f'/verify_login/{login}') as response:
-                    if response.status == 409:
-                        self._login = login
-                        await self._update_text({
-                            0: {'data': "❔"},
-                            1: {"data": Italic("Login already using")}
-                        })
-                    else:
-                        self._login = login
-                        await self._update_text({
-                            0: {'data': Italic(login)},
-                            1: {"data": Italic("Login allowed")}
-                        })
+            async with session.get(f'/verify_login/{login}') as response:
+                if response.status == 409:
+                    await self._text_map['feedback'].update_text(
+                        data=Bold(f"Login {self._login} already using"),
+                        mark=DENIAL
+                    )
+                else:
+                    self._login = login
+                    await self._text_map['login'].update_text(data=Bold(login))
+                    await self._text_map['feedback'].update_text(data=Italic("Login allowed"), mark=OK)
 
 
 class Password(Markup):

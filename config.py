@@ -1,1 +1,3 @@
 PASSWORD_LENGTH = 40
+OK = '✅'
+DENIAL = '❌'
