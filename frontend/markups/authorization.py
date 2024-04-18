@@ -10,6 +10,6 @@ class Authorization(Markup):
                 "login": ButtonWidget("🔐 Login", "authorization_login")
             },
             {
-                "sign_in": ButtonWidget("🔓🔑 Sign in", "sign_in")
+                "sign_in": ButtonWidget("🔓🔑 Sign up", "sign_up")
             }
         ]

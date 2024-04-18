@@ -6,7 +6,7 @@ from aiogram.exceptions import TelegramBadRequest
 from frontend import bot
 from frontend.interface.sign_in import sign_in_router
 from frontend.markups.authorization import Authorization
-from frontend.markups.sign_in import SignIn
+from frontend.markups.sign_in import SignUp
 
 authorization_router = Router()
 authorization_router.include_routers(
@@ -26,7 +26,7 @@ async def open_authorization(message: Message, state: FSMContext):
     authorization = Authorization()
     current_data = {
         "authorization": await authorization.serialize(),
-        "sign_in": await SignIn().serialize()
+        "sign_in": await SignUp().serialize()
     }
     message = await message.answer(text=await authorization.text, reply_markup=await authorization.markup)
     current_data["message_id"] = message.message_id

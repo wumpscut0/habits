@@ -3,7 +3,7 @@ from base64 import b64encode
 from typing import List, Dict
 from aiogram.filters.callback_data import CallbackData
 from aiogram.types import InputMediaPhoto
-from aiogram.utils.formatting import as_list, Text
+from aiogram.utils.formatting import as_list, Text, Bold
 from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardButton
 from config import *
 
@@ -83,7 +83,19 @@ class ButtonWidget:
 class CommonTexts:
     @staticmethod
     def feedback():
-        return TextWidget('📝 Feedback', mark=OK)
+        return TextWidget(Bold('📝 Feedback'), mark=OK)
+
+    @staticmethod
+    def nickname():
+        return TextWidget(Bold('🪪 Nickname'))
+
+    @staticmethod
+    def login():
+        return TextWidget(Bold('🆔 Login'))
+
+    @staticmethod
+    def password():
+        return TextWidget(Bold('🔑 Password'))
 
 
 class CommonButtons:

@@ -11,7 +11,7 @@ from fastapi import FastAPI
 app = FastAPI()
 
 
-@app.post('/sign_in', status_code=201)
+@app.post('/sign_up', status_code=201)
 async def sign_in_(sign_in: JWT):
     try:
         payload = await asyncio.to_thread(jwt.decode, jwt=sign_in, key=os.getenv('JWT'))
