@@ -8,7 +8,7 @@ class Base(DeclarativeBase):
 
 class User(Base):
     __tablename__ = 'user'
-    id = Column(BIGINT, primary_key=True, unique=True, autoincrement=False, nullable=False)
+    telegram_id = Column(BIGINT, nullable=False)
     nickname = Column(VARCHAR(10), nullable=False)
-    login = Column(VARCHAR(10), unique=True, nullable=False)
-    hash = Column(String, nullable=True)
+    login = Column(VARCHAR(10), primary_key=True, nullable=False)
+    password = Column(String, nullable=True)

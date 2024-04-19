@@ -5,17 +5,18 @@ import pydantic
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from backend.database import Session
-from backend.models import SignIn, JWT
+from backend.models import SignUp, JWT
 from backend.database.queries import sign_in__, verify_login_
 from fastapi import FastAPI
 app = FastAPI()
 
 
-@app.post('/sign_up', status_code=201)
-async def sign_in_(sign_in: JWT):
+@app.post('/sign_up/{sign_up}', status_code=201)
+async def sign_in_(sign_up: str):
     try:
-        payload = await asyncio.to_thread(jwt.decode, jwt=sign_in, key=os.getenv('JWT'))
-        data = SignIn.model_validate(payload)
+        payload = jwt.decode(sign_up, key=os.getenv('JWT'), algorithms="HS256")
+        print(payload)
+        data = SignUp.model_validate(payload)
         async with Session.begin() as session:
             await sign_in__(session, data)
     except jwt.InvalidTokenError:

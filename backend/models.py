@@ -5,8 +5,8 @@ class JWT(BaseModel):
     jwt: str
 
 
-class SignIn(BaseModel):
-    id: int
+class SignUp(BaseModel):
+    telegram_id: int
     nickname: str
     login: str
-    hash: str
+    password: str
