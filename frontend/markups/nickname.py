@@ -6,6 +6,7 @@ from frontend.markups import Markup, CommonTexts, CommonButtons
 class Nickname(Markup):
     def __init__(self):
         super().__init__()
+
         self._nickname = None
 
         self._header = "🪪 Enter the nickname"

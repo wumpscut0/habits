@@ -10,3 +10,8 @@ class SignUp(BaseModel):
     nickname: str
     login: str
     password: str
+
+
+class SignIn(BaseModel):
+    login: str
+    password: str

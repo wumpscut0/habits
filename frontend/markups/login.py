@@ -7,6 +7,7 @@ from frontend.markups import Markup, CommonTexts, CommonButtons
 class Login(Markup):
     def __init__(self):
         super().__init__()
+
         self._login = None
 
         self._header = 'Enter the login'
@@ -32,9 +33,10 @@ class Login(Markup):
             )
         else:
             async with session.get(f'/verify_login/{login}') as response:
-                if response.status == 409:
+                data = await response.json()
+                if response.status != 200:
                     await self._text_map['feedback'].update_text(
-                        data=f"Login {login} already using",
+                        data=data['detail'],
                         mark=DENIAL
                     )
                 else:

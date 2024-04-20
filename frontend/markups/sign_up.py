@@ -1,7 +1,7 @@
-import json
 import os
 import jwt
 from aiohttp import ClientSession
+from frontend import errors
 from frontend.markups import Markup, ButtonWidget, CommonButtons, CommonTexts
 from frontend.markups.login import Login
 from frontend.markups.nickname import Nickname
@@ -11,16 +11,33 @@ from frontend.markups.password import Password
 class SignUp(Markup):
     def __init__(self):
         super().__init__()
+        self._init_related_nodes()
+        self._init_data()
+
+        self._init_header()
+        self._init_text_map()
+        self._init_markup_map()
+
+    def _init_related_nodes(self):
         self._nickname = Nickname()
         self._login = Login()
         self._password = Password()
-        self._header = 'Fill all fields'
+
+    def _init_data(self):
+        ...
+
+    def _init_header(self):
+        self._header = '🔏 Sign up'
+
+    def _init_text_map(self):
         self._text_map = {
             "nickname": CommonTexts.nickname(),
             "login": CommonTexts.login(),
             "password": CommonTexts.password(),
             "feedback": CommonTexts.feedback(),
         }
+
+    def _init_markup_map(self):
         self._markup_map = [
             {
                 "nickname": ButtonWidget("🪪 Change nickname", "open_nickname"),
@@ -49,20 +66,10 @@ class SignUp(Markup):
 
     @property
     async def text(self):
-        nickname = "❔" if self._nickname.nickname is None else self._nickname.nickname
-        login = "❔" if self._login.login is None else self._login.login
-        password = "❔" if self._password.hash is None else self._password.password
-        await self._text_map['nickname'].update_text(data=nickname)
-        await self._text_map['login'].update_text(data=login)
-        await self._text_map['password'].update_text(data=password)
+        await self._text_map['nickname'].update_text(data=self._nickname.text_map['nickname'].data)
+        await self._text_map['login'].update_text(data=self._login.text_map['login'].data)
+        await self._text_map['password'].update_text(data=self._password.text_map['password'].data)
         return await super().text
-
-    async def _reset(self):
-        self._nickname = Nickname()
-        self._login = Login()
-        self._password = Password()
-        for widget in self._text_map.values():
-            widget.reset()
 
     async def try_sign_up(self, user_id: int, session: ClientSession):
         if not all((self._nickname.nickname, self._login.login, self._password.hash)):
@@ -78,11 +85,13 @@ class SignUp(Markup):
             },
             os.getenv('JWT')
         )
-        async with session.post(f'/sign_up/{request}') as response:
+        async with session.post(f'/sign_up', json={'jwt': request}) as response:
+            data = await response.json()
             if response.status != 201:
-                print((await response.json())['detail'])
-                await self._text_map['feedback'].update_text(data="Unknown error")
+                errors.error(data['detail'])
+                await self._text_map['feedback'].update_text(data=data['detail'])
                 return
 
-            await self._reset()
+            self._init_related_nodes()
+            self._init_text_map()
             await self._text_map['feedback'].update_text(data='Account created')

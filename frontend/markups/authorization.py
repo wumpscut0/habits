@@ -2,6 +2,7 @@ from aiogram.utils.formatting import Bold
 
 
 from frontend.markups import Markup, ButtonWidget
+from frontend.markups.sign_in import SignIn
 from frontend.markups.sign_up import SignUp
 
 
@@ -9,7 +10,7 @@ class Authorization(Markup):
     def __init__(self):
         super().__init__()
         self._header = '🧠 Psychological service'
-        # self._sign_in = SignIn()
+        self._sign_in = SignIn()
         self._sign_up = SignUp()
         self._markup_map = [
             {
@@ -21,5 +22,11 @@ class Authorization(Markup):
         ]
 
     @property
+    def sign_in(self):
+        return self._sign_in
+
+    @property
     def sign_up(self):
         return self._sign_up
+
+

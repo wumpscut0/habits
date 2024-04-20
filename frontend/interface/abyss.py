@@ -1,14 +1,17 @@
 from typing import List
 
 from aiogram import F, Router
+from aiogram.filters import or_f, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
+
+import config
 from frontend.interface import close_session, refill_trash, kill_message, update_text_by_message
 
-router_abyss = Router()
+abyss_router = Router()
 
 
-@router_abyss.message(F)
+@abyss_router.message(or_f(F.text.in_(config.COMMANDS), ~F.text, StateFilter(None)))
 async def abyss(message: Message, state: FSMContext, message_id: int, trash: List[int]):
     if message.text == 'clear':
         message_id = await close_session(message.chat.id, message_id)

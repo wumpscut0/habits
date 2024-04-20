@@ -1,7 +1,8 @@
-
+from aiogram.fsm.context import FSMContext
 from passlib.handlers.pbkdf2 import pbkdf2_sha256
 from zxcvbn import zxcvbn
 from config import *
+from frontend.FSM import SignUpState
 from frontend.markups import Markup, CommonTexts, TextWidget, CommonButtons, ButtonWidget
 
 
@@ -20,7 +21,7 @@ class Password(Markup):
         self._repeat_password = None
         self._hash = None
 
-        self._header = 'Enter the password'
+        self._header = '🔑 Enter the password'
         self._text_map = {
             "password": CommonTexts.password(),
             "repeat_password": TextWidget("🔑 Repeat password"),
@@ -34,7 +35,7 @@ class Password(Markup):
                 "accept": CommonButtons.accept("open_sign_up")
             },
             {
-                "input_mode": ButtonWidget("🔄 Input mode", "mode_password"),
+                "input_mode": CommonButtons.invert_mode("mode_password"),
             },
         ]
 
@@ -46,11 +47,13 @@ class Password(Markup):
     def hash(self):
         return self._hash
 
-    async def invert_input_mode(self):
-        if self._header == 'Enter the password':
-            self._header = "Repeat the password"
+    async def invert_input_mode(self, state: FSMContext):
+        if self._header == '🔑 Enter the password':
+            self._header = "🔑🔑 Repeat the password"
+            await state.set_state(SignUpState.repeat_password)
         else:
-            self._header = 'Enter the password'
+            self._header = '🔑 Enter the password'
+            await state.set_state(SignUpState.repeat_password)
 
     async def update_password(self, password):
         self._hash = None
@@ -70,8 +73,6 @@ class Password(Markup):
             await self._text_map['warning'].update_text(data=warning)
             suggestions = "\n" + "\n".join(suggestions) if suggestions is not None else OK
             await self._text_map['suggestions'].update_text(data=suggestions)
-
-            await self.invert_input_mode()
 
     async def repeat_password(self, password):
         if len(password) > PASSWORD_LENGTH:

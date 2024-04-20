@@ -2,6 +2,7 @@ import pickle
 from base64 import b64encode
 from typing import List, Dict
 from aiogram.filters.callback_data import CallbackData
+from aiogram.fsm.state import State
 from aiogram.types import InputMediaPhoto
 from aiogram.utils.formatting import as_list, Text, Bold, Italic
 from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardButton
@@ -26,6 +27,10 @@ class TextWidget:
     def text(self):
         separator = '' if str(self._header).startswith(' ') else ' '
         return Text(self._mark) + Text(separator) + Bold(self._header) + Text(': ') + Italic(self._data)
+
+    @property
+    def data(self):
+        return self._data
 
     def reset(self):
         self._data = self._default_data
@@ -115,6 +120,10 @@ class CommonButtons:
     def back(callback_data: str | CallbackData):
         return ButtonWidget('⬇️', callback_data)
 
+    @staticmethod
+    def invert_mode(callback_data: str | CallbackData):
+        return ButtonWidget("🔄 Input mode", callback_data)
+
 
 class SerializableMixin:
     async def serialize(self):
@@ -141,21 +150,27 @@ class Markup(SerializableMixin):
         self._markup_map: List[Dict[str, ButtonWidget]] = [{}]
 
     @property
+    def text_map(self):
+        return self._text_map
+
+    @property
     async def text(self):
         if self._text_map:
             if self._header:
                 header = Bold(self._header)
             else:
                 header = Text('')
-            return (header + '\n' + as_list(*[row.text for row in self._text_map.values()])).as_html()
+            return (header + '\n🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻\n️' + as_list(*[row.text for row in self._text_map.values()])).as_html()
         return Bold(self._header).as_html()
 
     @property
     async def markup(self):
         return InlineKeyboardBuilder([[button.button for button in row.values()] for row in self._markup_map]).as_markup()
 
-    async def _update_header(self, header: str):
-        self._header = header
+    async def _reset(self):
+        self._header = self._default_header
+        for widget in self._text_map.values():
+            widget.reset()
 
 
 
