@@ -1,69 +1,33 @@
 import os
 import jwt
-import asyncio
-import pydantic
-from fastapi import HTTPException
-from sqlalchemy.exc import IntegrityError
 from backend.database import Session
-from backend.models import SignUp, JWT, SignIn
-from backend.database.queries import sign_up_,  sign_in_, is_exist_login
-from fastapi import FastAPI
+from backend.models import Auth, Password, SignUp
+from backend.database.queries import authorization, update_password, sign_up, sign_in, get_user, verify_password
+from fastapi import FastAPI, Header, HTTPException
+from typing import Annotated
 app = FastAPI()
 
 
-@app.post('/sign_up', status_code=201)
-async def sign_up(x: JWT):
-    try:
-        data = jwt.decode(x.jwt, key=os.getenv('JWT'), algorithms="HS256")
-        data = SignUp.model_validate(data)
-        async with Session.begin() as session:
-            await sign_up_(session, data)
-    except jwt.InvalidTokenError:
-        raise HTTPException(
-            status_code=400, detail="Invalid jwt token"
-        )
-    except pydantic.ValidationError:
-        raise HTTPException(
-            status_code=422, detail="Validation error"
-        )
-    except IntegrityError:
-        raise HTTPException(
-            status_code=409, detail=f"User with login {data.login} already exist"
-        )
-
-
-@app.post("/sign_in")
-async def sign_in(x: JWT):
-    try:
-        data = jwt.decode(x.jwt, key=os.getenv('JWT'), algorithms='HS256')
-        data = SignIn.model_validate(data)
-        async with Session.begin() as session:
-            user = await sign_in_(session, data)
-            if user:
-                return {
-                    "success": True,
-                    "nickname": user.nickname
-                }
-            raise HTTPException(
-                status_code=401, detail=f"Wrong login or password"
-            )
-
-    except jwt.InvalidTokenError:
-        raise HTTPException(
-            status_code=400, detail="Invalid jwt token"
-        )
-    except pydantic.ValidationError:
-        raise HTTPException(
-            status_code=422, detail="Validation error"
-        )
-
-
-@app.get('/verify_login/{login}', status_code=200)
-async def verify_login(login: str):
+@app.post("/sign_up")
+async def sign_up_(sign_up__: SignUp):
     async with Session.begin() as session:
-        if not await is_exist_login(session, login):
-            return {"success": True}
+        await sign_up(session, **sign_up__.model_dump())
 
-    raise HTTPException(
-        409, f'User with login "{login}" already exists.'
-    )
+
+@app.patch('/update_password')
+async def update_password_(update_password__: Password, Authorization: Annotated[str, Header()]):
+    async with Session.begin() as session:
+        await authorization(session, Authorization)
+        await update_password(session, **update_password__.model_dump())
+
+
+@app.get("/sign_in")
+async def sign_in(auth: Auth):
+    async with Session.begin() as session:
+        user = await get_user(session, auth.telegram_id)
+        if user.password is not None and auth.password is None:
+            raise HTTPException(400, 'Give me hash')
+        elif user.password is not None and auth.password:
+            await verify_password(auth.password, user.hash)
+
+        return jwt.encode(auth.model_dump(), os.getenv('JWT'))

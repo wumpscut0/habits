@@ -9,6 +9,27 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardButton
 from config import *
 
 
+class HeaderWidget:
+    def __init__(self, header: str):
+        self._header = header
+        self._default_header = self._header
+
+    @property
+    def header(self):
+        if self._header:
+            header = Bold(self._header)
+        else:
+            header = Text('')
+        return header
+
+    @header.setter
+    def header(self, header):
+        self._header = header
+
+    def reset(self):
+        self._header = self._default_header
+
+
 class TextWidget:
     def __init__(
             self,
@@ -143,9 +164,11 @@ class WithPhotoMixin:
         self._photo = photo
 
 
-class Markup(SerializableMixin):
+class Markup:
+    state: State | None = None
+
     def __init__(self):
-        self._header: str = ''
+        self._header: HeaderWidget = HeaderWidget('')
         self._text_map: Dict[str, TextWidget] = {}
         self._markup_map: List[Dict[str, ButtonWidget]] = [{}]
 
@@ -156,19 +179,15 @@ class Markup(SerializableMixin):
     @property
     async def text(self):
         if self._text_map:
-            if self._header:
-                header = Bold(self._header)
-            else:
-                header = Text('')
-            return (header + '\n🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻\n️' + as_list(*[row.text for row in self._text_map.values()])).as_html()
+            return (as_list(*[row.text for row in self._text_map.values()]) + '\n🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻\n️' + self._header.header).as_html()
         return Bold(self._header).as_html()
 
     @property
     async def markup(self):
         return InlineKeyboardBuilder([[button.button for button in row.values()] for row in self._markup_map]).as_markup()
 
-    async def _reset(self):
-        self._header = self._default_header
+    async def reset(self):
+        self._header.reset()
         for widget in self._text_map.values():
             widget.reset()
 

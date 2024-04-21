@@ -8,7 +8,7 @@ from frontend.markups.nickname import Nickname
 from frontend.markups.password import AddPassword
 
 
-class SignUp(Markup):
+class SignUp2(Markup):
     def __init__(self):
         super().__init__()
         self._init_related_nodes()

@@ -1,17 +1,15 @@
 from pydantic import BaseModel
 
 
-class JWT(BaseModel):
-    jwt: str
-
-
 class SignUp(BaseModel):
     telegram_id: int
-    nickname: str
-    login: str
-    password: str
 
 
-class SignIn(BaseModel):
-    login: str
-    password: str
+class Auth(BaseModel):
+    telegram_id: int
+    password: str | None
+
+
+class AuthWithPassword(BaseModel):
+    telegram_id: int
+    hash: str

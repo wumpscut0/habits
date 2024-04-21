@@ -12,7 +12,7 @@ abyss_router = Router()
 
 
 @abyss_router.message(or_f(F.text.in_(config.COMMANDS), ~F.text, StateFilter(None)))
-async def abyss(message: Message, state: FSMContext, message_id: int, trash: List[int]):
+async def abyss(message: Message, state: FSMContext, message_id: int):
     if message.text == 'clear':
         message_id = await close_session(message.chat.id, message_id)
         if isinstance(message_id, int):
@@ -23,9 +23,7 @@ async def abyss(message: Message, state: FSMContext, message_id: int, trash: Lis
         status = await state.get_state()
         new_message = await message.answer(text=status if status is not None else 'None')
         await refill_trash(new_message.message_id, state)
-    if message.text == 'clean':
-        for message_id in trash:
-            await kill_message(message.chat.id, message_id)
+
     # if message.text == 'update':
     #     await update_text_by_message(message.)
 

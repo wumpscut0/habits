@@ -16,7 +16,7 @@ profile_router = Router()
 async def open_profile(callback: CallbackQuery, state: FSMContext, interface: Interface, session: ClientSession):
     await state.set_state(None)
 
-    sign_in: SignIn = interface.authorization.sign_in
+    sign_in: SignIn = interface.profile.sign_in
 
     success = await sign_in.try_sign_in(session)
 

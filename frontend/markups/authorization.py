@@ -1,32 +1,59 @@
-from aiogram.utils.formatting import Bold
-
-
 from frontend.markups import Markup, ButtonWidget
-from frontend.markups.sign_in import SignIn
-from frontend.markups.sign_up import SignUp
+from frontend.markups.password import InputPassword
 
 
-class Authorization(Markup):
+class Profile(Markup):
     def __init__(self):
         super().__init__()
-        self._header = '🧠 Psychological service'
-        self._sign_in = SignIn()
-        self._sign_up = SignUp()
+        # self._habit = Habit()
+        self._input_password = InputPassword()
         self._markup_map = [
             {
-                "sign_in": ButtonWidget("🔐 Login", "open_sign_in")
+                "habits": ButtonWidget("🧠 Habits", "open_habits")
             },
             {
-                "sign_up": ButtonWidget("🔓🔑 Sign up", "open_sign_up")
-            }
+                "update_password": ButtonWidget("🔑 Add password", "open_input_password")
+            },
         ]
 
     @property
-    def sign_in(self):
-        return self._sign_in
+    def habit(self):
+        return self._habit
 
     @property
-    def sign_up(self):
-        return self._sign_up
+    def input_password(self):
+        return self._input_password
+
+
+# import json
+# import os
+# import jwt
+# from aiohttp import ClientSession
+#
+# from frontend import errors
+# from frontend.markups import Markup, ButtonWidget, CommonButtons, CommonTexts
+# from frontend.markups.login import Login
+# from frontend.markups.nickname import Nickname
+# from frontend.markups.password import AddPassword
+#
+#
+# class Profile(Markup):
+#     """
+#     Data in database and data in redis will be merged every sign in
+#     """
+#     def __init__(self):
+#         super().__init__()
+#
+#         self._markup_map = [
+#             {
+#                 'back': CommonButtons.back('open_authorization')
+#             }
+#         ]
+#
+#     async def merge_nickname(self, nickname):
+#         if self._text_map.get('nickname') is None:
+#             self._text_map['nickname'] = CommonTexts.nickname()
+#
+#         await self._text_map['nickname'].update_text(data=nickname)
 
 

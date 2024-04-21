@@ -13,7 +13,7 @@ sign_in_router = Router()
 
 @sign_in_router.callback_query(F.data == 'open_sign_in')
 async def open_sign_in(callback: CallbackQuery, state: FSMContext, interface: Interface):
-    sign_in: SignIn = interface.authorization.sign_in
+    sign_in: SignIn = interface.profile.sign_in
 
     await sign_in.reset(state)
 
@@ -24,7 +24,7 @@ async def open_sign_in(callback: CallbackQuery, state: FSMContext, interface: In
 
 @sign_in_router.message(StateFilter(SignInState.input_login), F.text)
 async def input_login(message: Message, state: FSMContext, interface: Interface, message_id: int):
-    sign_in: SignIn = interface.authorization.sign_in
+    sign_in: SignIn = interface.profile.sign_in
 
     await sign_in.input_login(message.text)
 
@@ -37,7 +37,7 @@ async def input_login(message: Message, state: FSMContext, interface: Interface,
 
 @sign_in_router.message(StateFilter(SignInState.input_password), F.text)
 async def input_password(message: Message, state: FSMContext, interface: Interface, message_id: int):
-    sign_in: SignIn = interface.authorization.sign_in
+    sign_in: SignIn = interface.profile.sign_in
 
     await sign_in.input_password(message.text)
 
@@ -50,7 +50,7 @@ async def input_password(message: Message, state: FSMContext, interface: Interfa
 
 @sign_in_router.callback_query(F.data == 'mode_sign_in')
 async def mode_sign_in(callback: CallbackQuery, state: FSMContext, interface: Interface):
-    sign_in: SignIn = interface.authorization.sign_in
+    sign_in: SignIn = interface.profile.sign_in
 
     await sign_in.invert_input_mode(state)
 
