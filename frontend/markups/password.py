@@ -1,10 +1,10 @@
-from aiogram.fsm.context import FSMContext
+from aiohttp import ClientSession
 from passlib.handlers.pbkdf2 import pbkdf2_sha256
 from zxcvbn import zxcvbn
 from config import *
-
-from frontend.markups import Markup, CommonTexts, TextWidget, CommonButtons, ButtonWidget
-from frontend.markups.interface import States
+from frontend.FSM import States, StateManager
+from frontend.markups import Markup, CommonTexts, DataTextWidget, CommonButtons, ButtonWidget, DataTextWidget, \
+    TextWidget
 
 
 class InputPassword(Markup):
@@ -15,18 +15,19 @@ class InputPassword(Markup):
         1: '🔴 Bad',
         0: '⚠️ Terrible'
     }
-    state = States.input_password
 
     def __init__(self):
         super().__init__()
         self._password_resume = PasswordResume()
 
+        self._state = StateManager(States.input_password)
+
         self._password = None
         self._hash = None
 
-        self._header = 'Enter the password'
         self._text_map = {
-            "feedback": CommonTexts.feedback()
+            "feedback": CommonTexts.feedback(),
+            "action": TextWidget('Enter the password')
         }
         self._markup_map = [
             {
@@ -42,9 +43,9 @@ class InputPassword(Markup):
         if len(password) > PASSWORD_LENGTH:
             await self._text_map['feedback'].update_text(data=f"Maximum password length is {PASSWORD_LENGTH} symbols")
         else:
-            self.state = States.repeat_password
+            self._state = States.repeat_password
 
-            self._header = 'Repeat the password'
+            self._text_map['action'].text = 'Repeat the password'
 
             self._password = password
 
@@ -62,44 +63,72 @@ class InputPassword(Markup):
         return self
 
     async def repeat_password(self, password):
+        self._state = States.input_password
+        await self.reset()
         if password != self._password:
-            self.state = States.input_password
-
             await self._password_resume.reset()
             await self._text_map['feedback'].update_text(data="Passwords not matched")
             return self
         else:
-            self._hash = pbkdf2_sha256.password(password)
+            self._hash = pbkdf2_sha256.hash(password)
             return self._password_resume
+
+    @property
+    def hash(self):
+        self._password = None
+        return self._hash
 
 
 class PasswordResume(Markup):
     def __init__(self):
         super().__init__()
-        self._password = None
-        self._repeat_password = None
-        self._hash = None
+        self._password_warning = PasswordWarning()
 
-        self._header = '🔑 Enter the password'
+        self._header = DataTextWidget('Password grade')
         self._text_map = {
-            "strength": TextWidget("🛡️ Strength"),
-            "warning": TextWidget("⚠️ Warning"),
-            "suggestions": TextWidget("🌟 Suggestions"),
+            "strength": DataTextWidget("🛡️ Strength"),
+            "warning": DataTextWidget("⚠️ Warning"),
+            "suggestions": DataTextWidget("🌟 Suggestions"),
             "feedback": CommonTexts.feedback(),
         }
         self._markup_map = [
             {
-                "accept": CommonButtons.accept("open_sign_up")
+                "accept": CommonButtons.accept("open_warning")
             },
             {
-                "input_mode": CommonButtons.invert_mode("mode_password"),
-            },
+                "cancel": ButtonWidget(f'{DENIAL} Cancel', "open_profile")
+            }
         ]
 
     @property
-    def password(self):
-        return '*' * len(self._password)
+    def password_warning(self):
+        return self._password_warning
 
-    @property
-    def hash(self):
-        return self._hash
+
+class PasswordWarning(Markup):
+    def __init__(self):
+        super().__init__()
+        self._header = DataTextWidget('⚠️ Warning. If you forget password. Access to account data will be lost forever')
+        self._markup_map = [
+            {
+                "understand": ButtonWidget(f"{OK} I understand", "update_password"),
+                "cancel": ButtonWidget(f'{DENIAL} Cancel', 'open_warning')
+            }
+        ]
+
+
+class SignInPassword(Markup):
+    def __init__(self):
+        super().__init__()
+        self._state = States.sign_in_with_password
+        self._header = DataTextWidget('🔑 Enter the password')
+        self._text_map = {
+            "feedback": CommonTexts.feedback()
+        }
+
+    async def sign_in_with_password(self, session: ClientSession, password: str, telegram_id: int) -> str | None:
+        async with session.get('sign_in', json={'telegram_id': telegram_id, "password": password}) as response:
+            if response.status == 200:
+                return (await response.json())['token']
+            else:
+                await self._text_map['feedback'].update_text(data='Wrong password')

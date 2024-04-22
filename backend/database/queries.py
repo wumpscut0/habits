@@ -6,7 +6,7 @@ from sqlalchemy import update, insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.database.models import User
-from backend.models import Auth
+from backend.routers.models import Auth
 from passlib.hash import pbkdf2_sha256
 
 
@@ -21,8 +21,8 @@ async def get_user(session: AsyncSession, telegram_id: int):
 
 async def sign_up(session: AsyncSession, telegram_id: int):
     try:
-        async with session.begin():
-            await session.execute(insert(User).values({"telegram_id": telegram_id}))
+        await session.execute(insert(User).values({"telegram_id": telegram_id}))
+        await session.commit()
     except IntegrityError:
         raise HTTPException(409, "User already exists")
 

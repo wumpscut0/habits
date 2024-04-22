@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel
 
 
@@ -7,9 +9,9 @@ class SignUp(BaseModel):
 
 class Auth(BaseModel):
     telegram_id: int
-    password: str | None
+    password: Optional[str] = None
 
 
-class AuthWithPassword(BaseModel):
+class UpdatePassword(BaseModel):
     telegram_id: int
     hash: str

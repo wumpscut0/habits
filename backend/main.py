@@ -4,4 +4,4 @@ load_dotenv(find_dotenv())
 
 
 if __name__ == '__main__':
-    uvicorn.run('routers:app', reload=True)
+    uvicorn.run('routers.routers:app', reload=True)

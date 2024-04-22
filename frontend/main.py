@@ -2,19 +2,15 @@ from asyncio import run
 from aiogram import Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage, Redis
 from frontend import bot
-from frontend.interface.abyss import abyss_router
-from frontend.interface.authorization import authorization_router
-from frontend.interface.profile import profile_router
-from frontend.interface.sign_in import sign_in_router
+from frontend.routers.abyss import abyss_router
 from frontend.middlewares import CommonMiddleware
+from frontend.routers.profile import profile_router
 
 dispatcher = Dispatcher(storage=RedisStorage(Redis()))
 dispatcher.update.middleware(CommonMiddleware())
 dispatcher.include_routers(
-    authorization_router,
+    profile_router,
     abyss_router,
-    sign_in_router,
-    profile_router
 )
 
 

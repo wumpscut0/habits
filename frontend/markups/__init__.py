@@ -1,36 +1,37 @@
 import pickle
+from abc import ABC, abstractmethod
 from base64 import b64encode
 from typing import List, Dict
 from aiogram.filters.callback_data import CallbackData
-from aiogram.fsm.state import State
 from aiogram.types import InputMediaPhoto
 from aiogram.utils.formatting import as_list, Text, Bold, Italic
 from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardButton
 from config import *
-
-
-class HeaderWidget:
-    def __init__(self, header: str):
-        self._header = header
-        self._default_header = self._header
-
-    @property
-    def header(self):
-        if self._header:
-            header = Bold(self._header)
-        else:
-            header = Text('')
-        return header
-
-    @header.setter
-    def header(self, header):
-        self._header = header
-
-    def reset(self):
-        self._header = self._default_header
+from frontend.FSM import StateManager
 
 
 class TextWidget:
+    def __init__(self, text: str):
+        self._text = text
+        self._default_text = self._text
+
+    @property
+    def text(self):
+        if self._text:
+            text = Bold(self._text)
+        else:
+            text = Text('')
+        return text
+
+    @text.setter
+    def text(self, header):
+        self._text = header
+
+    async def reset(self):
+        self._text = self._default_text
+
+
+class DataTextWidget:
     def __init__(
             self,
             header: str,
@@ -53,7 +54,7 @@ class TextWidget:
     def data(self):
         return self._data
 
-    def reset(self):
+    async def reset(self):
         self._data = self._default_data
         self._mark = self._default_mark
 
@@ -89,7 +90,7 @@ class ButtonWidget:
         separator = '' if self._text.startswith(' ') else ' '
         return InlineKeyboardButton(text=self._mark + separator + self._text, callback_data=self._callback_data)
 
-    def reset(self):
+    async def reset(self):
         self._mark = self._default_mark
 
     async def update_button(
@@ -109,41 +110,25 @@ class ButtonWidget:
 class CommonTexts:
     @staticmethod
     def feedback():
-        return TextWidget('📝 Feedback')
-
-    @staticmethod
-    def nickname():
-        return TextWidget('🪪 Nickname')
-
-    @staticmethod
-    def login():
-        return TextWidget('🆔 Login')
-
-    @staticmethod
-    def password():
-        return TextWidget('🔑 Password')
+        return DataTextWidget('📝 Feedback')
 
 
 class CommonButtons:
     @staticmethod
-    def accept(callback_data: str | CallbackData):
-        return ButtonWidget('Accept', callback_data, OK)
+    def accept(callback_data: str | CallbackData, text='Accept'):
+        return ButtonWidget(text, callback_data, OK)
 
     @staticmethod
-    def left(callback_data: str | CallbackData):
-        return ButtonWidget('⬅️', callback_data)
+    def left(callback_data: str | CallbackData, text='Previous'):
+        return ButtonWidget(f'⬅️ {text}', callback_data)
 
     @staticmethod
-    def right(callback_data: str | CallbackData):
-        return ButtonWidget('➡️', callback_data)
+    def right(callback_data: str | CallbackData, text='Next'):
+        return ButtonWidget(f'➡️ {text}', callback_data)
 
     @staticmethod
-    def back(callback_data: str | CallbackData):
-        return ButtonWidget('⬇️', callback_data)
-
-    @staticmethod
-    def invert_mode(callback_data: str | CallbackData):
-        return ButtonWidget("🔄 Input mode", callback_data)
+    def back(callback_data: str | CallbackData, text='Back'):
+        return ButtonWidget(f'⬇️ {text}', callback_data)
 
 
 class SerializableMixin:
@@ -164,13 +149,36 @@ class WithPhotoMixin:
         self._photo = photo
 
 
-class Markup:
-    state: State | None = None
-
+class Markup(ABC):
     def __init__(self):
-        self._header: HeaderWidget = HeaderWidget('')
-        self._text_map: Dict[str, TextWidget] = {}
+        self._init()
+
+    def _init(self):
+        self._init_related_markups()
+        self._init_state()
+        self._init_data()
+        self._init_text_map()
+        self._init_markup_map()
+
+    def _init_state(self):
+        self._state: StateManager | None = None
+
+    def _init_related_markups(self):
+        ...
+
+    def _init_data(self):
+        ...
+
+    @abstractmethod
+    def _init_text_map(self):
+        self._text_map: Dict[str, DataTextWidget | TextWidget] = {}
+
+    def _init_markup_map(self):
         self._markup_map: List[Dict[str, ButtonWidget]] = [{}]
+
+    @property
+    def state(self):
+        return self._state
 
     @property
     def text_map(self):
@@ -178,18 +186,19 @@ class Markup:
 
     @property
     async def text(self):
-        if self._text_map:
-            return (as_list(*[row.text for row in self._text_map.values()]) + '\n🌻🌻🌻🌻🌻🌻🌻🌻🌻🌻\n️' + self._header.header).as_html()
-        return Bold(self._header).as_html()
+        return (as_list(*[row.text for row in self._text_map.values()])).as_html()
 
     @property
     async def markup(self):
         return InlineKeyboardBuilder([[button.button for button in row.values()] for row in self._markup_map]).as_markup()
 
     async def reset(self):
-        self._header.reset()
+        await self._state.reset()
         for widget in self._text_map.values():
-            widget.reset()
+            await widget.reset()
+        for row in self._markup_map:
+            for button in row.values():
+                await button.reset()
 
 
 
