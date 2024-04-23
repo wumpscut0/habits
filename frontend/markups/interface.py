@@ -59,12 +59,12 @@ class Interface(SerializableMixin):
         await state.set_state(markup.state)
         await self._update_interface_in_redis(state)
         await bot.edit_message_text(chat_id=self._chat_id, message_id=self._message_id, text=await markup.text, reply_markup=await markup.markup)
-        await self._clean_trash()
+        await self.clean_trash()
 
     async def _update_interface_in_redis(self, state):
         await state.update_data({'interface': await self.serialize()})
 
-    async def _clean_trash(self):
+    async def clean_trash(self):
         for message_id in self._trash:
             try:
                 await bot.delete_message(self._chat_id, message_id)

@@ -2,7 +2,7 @@ from aiogram.fsm.state import StatesGroup, State
 
 
 class StateManager:
-    def __init__(self, state: State):
+    def __init__(self, state: State | None = None):
         self._state = state
         self._default_state = self._state
 

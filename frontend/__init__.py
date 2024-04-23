@@ -31,7 +31,13 @@ config = {
                 "handlers": [
                     "errors"
                 ]
-            }
+            },
+            "info": {
+                "level": logging.INFO,
+                "handlers": [
+                    "info"
+                ]
+            },
         }
     }
 dictConfig(config)

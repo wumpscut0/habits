@@ -14,12 +14,11 @@ profile_router.include_routers(password_router)
 @profile_router.message(CommandStart())
 async def open_authorization(message: Message, interface: Interface, session: ClientSession, state: FSMContext):
     await interface.close_session(state)
-    # print(interface.chat_id)
     async with session.post('/sign_in', json={'telegram_id': interface.chat_id}) as response:
         if response.status == 400:
             await interface.open_session(state, interface.profile.sign_in_with_password)
         elif response.status == 200:
-            await interface.open_session(state, await interface.profile.set_hello(message.from_user.full_name))
+            await interface.open_session(state, await interface.profile.update_hello(message.from_user.full_name))
         else:
             await message.answer('Internal server error')
     await message.delete()
@@ -36,4 +35,4 @@ async def sign_in_with_password(message: Message, interface: Interface, session:
 
 @profile_router.callback_query(F.data == 'open_profile')
 async def open_profile(message: Message, interface: Interface, state: FSMContext):
-    await interface.update_interface(state, await interface.profile.set_hello(message.from_user.full_name))
+    await interface.update_interface(state, await interface.profile.update_hello(message.from_user.full_name))

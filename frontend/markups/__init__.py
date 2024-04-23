@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from base64 import b64encode
 from typing import List, Dict
 from aiogram.filters.callback_data import CallbackData
+from aiogram.fsm.state import State
 from aiogram.types import InputMediaPhoto
 from aiogram.utils.formatting import as_list, Text, Bold, Italic
 from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardButton
@@ -10,14 +11,28 @@ from config import *
 from frontend.FSM import StateManager
 
 
+class Widget:
+    def __init__(self):
+        self._status = True
+
+    def on(self):
+        self._status = True
+
+    def off(self):
+        self._status = False
+
+
 class TextWidget:
     def __init__(self, text: str):
         self._text = text
         self._default_text = self._text
 
+    def __repr__(self):
+        return self.text.as_html()
+
     @property
     def text(self):
-        if self._text:
+        if self._text and self._status:
             text = Bold(self._text)
         else:
             text = Text('')
@@ -38,17 +53,22 @@ class DataTextWidget:
             *,
             data: str = '❔',
             mark: str = '',
+            sep: str = ': '
     ):
         self._header = header
         self._data = data
         self._mark = mark
+        self._sep = sep
         self._default_mark = self._mark
         self._default_data = self._data
+
+    def __repr__(self):
+        return self.text.as_html()
 
     @property
     def text(self):
         separator = '' if str(self._header).startswith(' ') else ' '
-        return Text(self._mark) + Text(separator) + Bold(self._header) + Text(': ') + Italic(self._data)
+        return Text(self._mark) + Text(separator) + Bold(self._header) + Text(self._sep) + Italic(self._data)
 
     @property
     def data(self):
@@ -161,7 +181,7 @@ class Markup(ABC):
         self._init_markup_map()
 
     def _init_state(self):
-        self._state: StateManager | None = None
+        self._state_manager: StateManager = StateManager()
 
     def _init_related_markups(self):
         ...
@@ -178,7 +198,11 @@ class Markup(ABC):
 
     @property
     def state(self):
-        return self._state
+        return self._state_manager.state
+
+    @state.setter
+    def state(self, state: State):
+        self._state_manager.state = state
 
     @property
     def text_map(self):
@@ -193,7 +217,7 @@ class Markup(ABC):
         return InlineKeyboardBuilder([[button.button for button in row.values()] for row in self._markup_map]).as_markup()
 
     async def reset(self):
-        await self._state.reset()
+        await self._state_manager.reset()
         for widget in self._text_map.values():
             await widget.reset()
         for row in self._markup_map:

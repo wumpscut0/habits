@@ -1,14 +1,22 @@
-from frontend.markups import Markup, ButtonWidget, CommonButtons, DataTextWidget
+from frontend.markups import Markup, ButtonWidget, CommonButtons, DataTextWidget, TextWidget
 from frontend.markups.password import InputPassword, SignInPassword
 
 
 class Profile(Markup):
     def __init__(self):
         super().__init__()
-        # self._habit = Habit()
-        self._header = DataTextWidget('Hello, ')
+
+    def _init_related_markups(self):
         self._input_password = InputPassword()
         self._sign_in_password = SignInPassword()
+        # self._habit = Habit()
+
+    def _init_text_map(self):
+        self._text_map = {
+            "hello": DataTextWidget('Hello', sep=', ')
+        }
+
+    def _init_markup_map(self):
         self._markup_map = [
             {
                 "habits": ButtonWidget("🧠 Habits", "open_habits")
@@ -34,8 +42,8 @@ class Profile(Markup):
         self._text_map['back'] = CommonButtons.back('open_input_password', text='Exit')
         return self
 
-    async def set_hello(self, name):
-        self._header.header = f'Hello, {name}'
+    async def update_hello(self, name):
+        await self._text_map['hello'].update_text(data=name)
         return self
 
 
