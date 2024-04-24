@@ -1,4 +1,7 @@
+from typing import List
+
 from frontend.markups import Markup, ButtonWidget, CommonButtons, DataTextWidget, TextWidget
+from frontend.markups.habits import Habits
 from frontend.markups.password import InputPassword, SignInPassword
 
 
@@ -9,7 +12,7 @@ class Profile(Markup):
     def _init_related_markups(self):
         self._input_password = InputPassword()
         self._sign_in_password = SignInPassword()
-        # self._habit = Habit()
+        self._habits = Habits()
 
     def _init_text_map(self):
         self._text_map = {

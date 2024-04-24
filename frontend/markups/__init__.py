@@ -32,7 +32,7 @@ class TextWidget:
 
     @property
     def text(self):
-        if self._text and self._status:
+        if self._text:
             text = Bold(self._text)
         else:
             text = Text('')
