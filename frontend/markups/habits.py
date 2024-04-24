@@ -16,7 +16,8 @@ class Habits(Markup):
     def _init_markup_map(self):
         self._markup_map = [
             {
-                "create": ButtonWidget("Create new target", "create_habit")
+                "create": ButtonWidget("🧠 Create new target", "create_habit"),
+                "update": ButtonWidget("")
             }
         ]
 
