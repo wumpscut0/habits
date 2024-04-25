@@ -2,7 +2,7 @@ import os
 import jwt
 import pydantic
 from fastapi import HTTPException
-from sqlalchemy import update, insert
+from sqlalchemy import update, insert, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.database.models import User
@@ -17,6 +17,13 @@ async def get_user(session: AsyncSession, telegram_id: int):
             status_code=404, detail="User not found"
         )
     return user
+
+
+async def get_user_email(session: AsyncSession, telegram_id: int):
+    return session.execute(select(User.email).where(User.telegram_id == telegram_id))
+
+
+async def update_user_
 
 
 async def sign_up(session: AsyncSession, telegram_id: int):

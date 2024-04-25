@@ -1,3 +1,15 @@
 PASSWORD_LENGTH = 40
-OK = '✅'
-DENIAL = '❌'
+
+
+class Emoji:
+    OK = "✅"
+    DENIAL = "❌"
+    BACK = "⬇️"
+    KEY = "🔑"
+    DOOR = "🚪"
+    BRAIN = "🧠"
+    MEGAPHONE = "📢"
+    SHINE_STAR = "🌟"
+    WARNING = "⚠️"
+    SHIELD = "🛡"
+    CYCLE = "🔄"

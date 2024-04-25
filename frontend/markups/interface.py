@@ -1,21 +1,25 @@
+from typing import Any, Dict
+
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 
 from frontend import bot
 from frontend.markups import SerializableMixin, Markup
-from frontend.markups.password import InputPassword, SignInPassword, PasswordWarning
+from frontend.markups.password import InputPassword, SignInWithPassword, PasswordResume, InputEmail, RepeatPassword
 from frontend.markups.profile import Profile
+from frontend.markups.sign_in import SignIn
 
 
 class Interface(SerializableMixin):
     def __init__(self, chat_id: int):
-        self._markups = {
-            "profile": Profile(self),
-            "input_password": InputPassword(self),
-            "warning_password": PasswordWarning(self),
-            "sign_in_password": SignInPassword(self),
+        self.sign_in = SignIn(self)
+        self.profile = Profile(self)
+        self.input_password = InputPassword(self)
+        self.repeat_password = RepeatPassword(self)
+        self.password_resume = PasswordResume(self)
+        self.input_email = InputEmail(self)
+        self.sign_in_password = SignInWithPassword(self)
 
-        }
         self._chat_id = chat_id
 
         self._current_markup = None
@@ -24,23 +28,31 @@ class Interface(SerializableMixin):
         self._token = None
         self._message_id = None
 
-    def __getitem__(self, item):
-        return self._markups[item]
+    # def __getitem__(self, item):
+    #     return self._markups[item]
+    #
+    # def __setitem__(self, key, value):
+    #     self._markups[key] = value
 
-    def __setitem__(self, key, value):
-        self._markups[key] = value
+    def __getattr__(self, item: str) -> Any:
+        if item in self._data:
+            return self._data[item]
+        raise AttributeError(f"'CustomDict' object has no attribute '{item}'")
 
     @property
     def current_markup(self) -> Markup:
         return self._current_markup
 
-    async def update_current_markup(self, state: FSMContext, markup: str):
-        markup = self._markups[markup]
+    async def update_current_markup(self, state: FSMContext, markup: Markup):
         self._current_markup = markup
         await state.set_state(markup.state)
         await self._update_interface_in_redis(state)
-        await bot.edit_message_text(chat_id=self._chat_id, message_id=self._message_id, text=await markup.text,
-                                    reply_markup=await markup.markup)
+        await bot.edit_message_text(
+            chat_id=self._chat_id,
+            message_id=self._message_id,
+            text=await markup.text,
+            reply_markup=await markup.markup
+        )
         await self.clean_trash()
 
     @property
@@ -69,13 +81,13 @@ class Interface(SerializableMixin):
 
         await self._update_interface_in_redis(state)
 
-    async def open_session(self, state, markup: Markup):
+    async def open_session(self, state):
         await state.set_state(None)
 
         message = await bot.send_message(
             chat_id=self._chat_id,
-            text=await markup.text,
-            reply_markup=await markup.markup
+            text=await self.sign_in.text,
+            reply_markup=await self.sign_in.markup
         )
         self._message_id = message.message_id
 

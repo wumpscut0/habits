@@ -16,7 +16,7 @@ async def open_authorization(message: Message, interface: Interface, session: Cl
     await interface.close_session(state)
     async with session.post('/sign_in', json={'telegram_id': interface.chat_id}) as response:
         if response.status == 400:
-            await interface.open_session(state, interface.profile.sign_in_with_password)
+            await interface.open_session(state, interface.sign_in_password.sign_in_with_password())
         elif response.status == 200:
             await interface.open_session(state, await interface.profile.update_hello(message.from_user.full_name))
         else:

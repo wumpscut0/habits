@@ -3,7 +3,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 
-class SignUp(BaseModel):
+class TelegramId(BaseModel):
     telegram_id: int
 
 

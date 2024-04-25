@@ -10,6 +10,7 @@ class User(Base):
     __tablename__ = 'user'
     telegram_id = Column(BIGINT, primary_key=True, autoincrement=False, nullable=False)
     hash = Column(VARCHAR(40), nullable=True)
+    email = Column(String, nullable=True, unique=True)
     remainder = Column(Boolean, default=True)
 
 
