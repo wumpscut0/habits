@@ -4,7 +4,8 @@ from passlib.handlers.pbkdf2 import pbkdf2_sha256
 
 from backend.database import Session
 from backend.routers.models import Auth, TelegramId, UpdatePassword
-from backend.database.queries import authorization, update_password, sign_up, get_user, get_user_email
+from backend.database.queries import authorization, update_password, sign_up, get_user, get_user_email, \
+    invert_user_notifications
 from fastapi import FastAPI, Header, HTTPException
 from typing import Annotated
 from backend.mailing import send_new_password
@@ -20,13 +21,6 @@ async def sign_up_(sign_up__: TelegramId):
         await sign_up(session, **sign_up__.model_dump())
 
 
-@app.patch('/update_password')
-async def update_password_(update_password__: UpdatePassword, Authorization: Annotated[str, Header()]):
-    async with Session.begin() as session:
-        await authorization(session, Authorization)
-        await update_password(session, **update_password__.model_dump())
-
-
 @app.post("/sign_in")
 async def sign_in(auth: Auth):
     async with Session.begin() as session:
@@ -39,6 +33,16 @@ async def sign_in(auth: Auth):
         return jwt.encode(auth.model_dump(), os.getenv('JWT'))
 
 
+@app.patch('/update_password')
+async def update_password_(update_password__: UpdatePassword, Authorization: Annotated[str, Header()]):
+    async with Session.begin() as session:
+        await authorization(session, Authorization)
+        await update_password(session, **update_password__.model_dump())
+
+
+
+
+
 @app.patch("/reset_password")
 async def get_mail(telegram_id: TelegramId):
     async with Session.begin() as session:
@@ -49,3 +53,12 @@ async def get_mail(telegram_id: TelegramId):
         hash_ = pbkdf2_sha256.hash(new_password)
         await update_password(session, telegram_id.telegram_id, hash_)
         return email
+
+
+@app.patch("/invert_notification")
+async def invert_notification(telegram_id: TelegramId):
+    async with Session.begin() as session:
+        return await invert_user_notifications(session, telegram_id.telegram_id)
+
+
+

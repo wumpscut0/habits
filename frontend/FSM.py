@@ -22,5 +22,6 @@ class States(StatesGroup):
     input_password = State()
     repeat_password = State()
     input_email = State()
+    input_verify_email_code = State()
     sign_in_with_password = State()
 

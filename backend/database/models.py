@@ -11,7 +11,7 @@ class User(Base):
     telegram_id = Column(BIGINT, primary_key=True, autoincrement=False, nullable=False)
     hash = Column(VARCHAR(40), nullable=True)
     email = Column(String, nullable=True, unique=True)
-    remainder = Column(Boolean, default=True)
+    notifications = Column(Boolean, default=True)
 
 
 class Habit(Base):

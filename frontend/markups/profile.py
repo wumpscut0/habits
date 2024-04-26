@@ -1,13 +1,12 @@
 from typing import List
-
 from aiogram.fsm.context import FSMContext
 from aiohttp import ClientSession
 
-
+from config import Emoji
 from frontend.markups import Markup, ButtonWidget, CommonButtons, DataTextWidget, TextWidget
 from frontend.markups.habits import Habits
 from frontend.markups.interface import Interface
-from frontend.markups.password import InputPassword, SignInWithPassword
+from frontend.markups.auth import InputNewPassword, SignInWithPassword
 
 
 class Profile(Markup):
@@ -29,17 +28,17 @@ class Profile(Markup):
                 "update_password": ButtonWidget("🔑 Add password", "open_input_password")
             },
             {
-                "exit": ButtonWidget(f'{BACK} Exit', "open_input_password", active=False)
+                "exit": ButtonWidget(f'{Emoji.BACK} Exit', "open_input_password", active=False)
             }
         ]
 
-    def on_exit_button(self):
+    def turn_on_exit_button(self):
         self._markup_map[2]['exit'].on()
         return self
 
     async def open_session(self, state: FSMContext, name):
         await self._text_map['hello'].update_text(data=name)
-        await self._interface.update_current_markup(state, )
+        await self._interface.update(state, )
 
     async def open_session_with_password(self, state: FSMContext, session: ClientSession):
 

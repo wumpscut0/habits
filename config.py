@@ -13,3 +13,5 @@ class Emoji:
     WARNING = "⚠️"
     SHIELD = "🛡"
     CYCLE = "🔄"
+    BELL = "🔔"
+    NOT_BELL = "🔕"

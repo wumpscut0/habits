@@ -58,3 +58,9 @@ async def authorization(session: AsyncSession, token: str):
 async def update_password(session: AsyncSession, telegram_id: int, hash_: str):
     async with session.begin():
         await session.execute(update(User).where(User.telegram_id == telegram_id).values({"password": hash_}))
+
+async def invert_user_notifications(session: AsyncSession, telegram_id: int):
+    async with session.begin():
+        notifications = (await session.execute(select(User.notifications).where(User.telegram_id == telegram_id))).scalar()
+        await session.execute(update(User).where(User.telegram_id == telegram_id).values({"notifications": not notifications}))
+    return "1" if not notifications else '0'
