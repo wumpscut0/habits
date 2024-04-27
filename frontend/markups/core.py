@@ -1,5 +1,5 @@
 import pickle
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, abstractproperty
 from base64 import b64encode
 from typing import List, Dict
 from aiogram.filters.callback_data import CallbackData
@@ -237,10 +237,63 @@ class Markup(ABC):
                 await button.reset()
 
 
-# class TextMap:
-#     def __init__(self, text_map: Dict[str, TextWidget | DataTextWidget]):
-#         for text_name, widget in text_map.items():
-#             setattr(self, text_name, widget)
+# class Markup(ABC):
+#     def __init__(self):
+#         self._init()
+#         self._state = None
+#
+#     def _init(self):
+#         self._init_state()
+#         self._init_text_map()
+#         self._init_markup_map()
+#
+#     def _init_state(self):
+#         self._state = None
+#
+#     @abstractmethod
+#     def _init_text_map(self):
+#         self._text_map: Dict[str, DataTextWidget | TextWidget] = {}
+#
+#     def _init_markup_map(self):
+#         self._markup_map: List[Dict[str, ButtonWidget]] = [{}]
+#
+#     @property
+#     def state(self):
+#         return self._state
+#
+#     @state.setter
+#     def state(self, state: State):
+#         self._state = state
+#
+#     @property
+#     def text_map(self):
+#         return self._text_map
+#
+#     @property
+#     def markup_map(self):
+#         return self._markup_map
+#
+#     @property
+#     async def text(self):
+#         return (as_list(*[row.text for row in self._text_map.values() if row.active])).as_html()
+#
+#     @property
+#     async def markup(self):
+#         return InlineKeyboardBuilder([[button.button for button in row.values() if button.active] for row in self._markup_map]).as_markup()
+#
+#     async def reset(self):
+#         for widget in self._text_map.values():
+#             await widget.reset()
+#         for row in self._markup_map:
+#             for button in row.values():
+#                 await button.reset()
+
+
+# class TextMap(ABC):
+#     def __init__(self):
+#         self._text_map = None
 #
 #
-# TextMap({'hello': TextWidget('hello')}).hello
+#     @property
+#     async def text(self):
+#         return (as_list(*[widget.text for widget in vars(self).values() if not callable(widget) and widget.active])).as_html()

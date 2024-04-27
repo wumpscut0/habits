@@ -4,7 +4,7 @@ from passlib.handlers.pbkdf2 import pbkdf2_sha256
 
 from backend.database import Session
 from backend.routers.models import Auth, TelegramId, UpdatePassword
-from backend.database.queries import authorization, update_password, sign_up, get_user, get_user_email, \
+from backend.database.queries import authentication, update_password, sign_up, get_user, get_user_email, \
     invert_user_notifications
 from fastapi import FastAPI, Header, HTTPException
 from typing import Annotated
@@ -22,7 +22,7 @@ async def sign_up_(sign_up__: TelegramId):
 
 
 @app.post("/sign_in")
-async def sign_in(auth: Auth):
+async def authorization(auth: Auth):
     async with Session.begin() as session:
         user = await get_user(session, auth.telegram_id)
         if user.hash is not None and auth.hash is None:
@@ -36,15 +36,12 @@ async def sign_in(auth: Auth):
 @app.patch('/update_password')
 async def update_password_(update_password__: UpdatePassword, Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
-        await authorization(session, Authorization)
+        await authentication(session, Authorization)
         await update_password(session, **update_password__.model_dump())
 
 
-
-
-
 @app.patch("/reset_password")
-async def get_mail(telegram_id: TelegramId):
+async def reset_password(telegram_id: TelegramId):
     async with Session.begin() as session:
         email = await get_user_email(session, telegram_id.telegram_id)
         if email is None:
@@ -60,5 +57,10 @@ async def invert_notification(telegram_id: TelegramId):
     async with Session.begin() as session:
         return await invert_user_notifications(session, telegram_id.telegram_id)
 
+
+@app.get('/show_up')
+async def show_up(Authorization: Annotated[str, Header()]):
+    async with Session.begin() as session:
+        await authentication(session, Authorization)
 
 

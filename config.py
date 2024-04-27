@@ -15,3 +15,5 @@ class Emoji:
     CYCLE = "🔄"
     BELL = "🔔"
     NOT_BELL = "🔕"
+    TARGET = "🎯"
+    EYE = "👁"

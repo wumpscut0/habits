@@ -22,29 +22,16 @@ class Profile(Markup):
     def _init_markup_map(self):
         self._markup_map = [
             {
-                "habits": ButtonWidget("🧠 Habits", "open_habits")
+                "habits": ButtonWidget("🧠 Habits", "habits")
             },
             {
-                "update_password": ButtonWidget("🔑 Add password", "open_input_password")
+                "update_password": ButtonWidget("🔑 Add password", "input_new_password")
             },
             {
-                "exit": ButtonWidget(f'{Emoji.BACK} Exit', "open_input_password", active=False)
+                "exit": ButtonWidget(f'{Emoji.BACK} Exit', "title_screen")
             }
         ]
 
-    def turn_on_exit_button(self):
-        self._markup_map[2]['exit'].on()
-        return self
-
-    async def open_session(self, state: FSMContext, name):
+    async def open_profile(self, name, state):
         await self._text_map['hello'].update_text(data=name)
-        await self._interface.update(state, )
-
-    async def open_session_with_password(self, state: FSMContext, session: ClientSession):
-
-    async def update_hello(self, name):
-
-        return self
-
-
-
+        await self._interface.update(state, self)

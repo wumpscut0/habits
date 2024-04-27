@@ -2,65 +2,141 @@ import os
 import jwt
 import pydantic
 from fastapi import HTTPException
-from sqlalchemy import update, insert, select
+from sqlalchemy import update, insert, select, and_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.database.models import User
-from backend.routers.models import Auth
+from sqlalchemy.orm import selectinload
+
+from backend.database.models import User, Habit
+from backend.routers.models import Auth, HabitM
 from passlib.hash import pbkdf2_sha256
 
 
-async def get_user(session: AsyncSession, telegram_id: int):
-    user = await session.get(User, ident=telegram_id)
-    if user is None:
-        raise HTTPException(
-            status_code=404, detail="User not found"
+class AuthQ:
+    @classmethod
+    async def registration(cls, session: AsyncSession, telegram_id: int):
+        try:
+            await session.execute(insert(User).values({"telegram_id": telegram_id}))
+            await session.commit()
+        except IntegrityError:
+            raise HTTPException(409, "User already exists")
+
+    @classmethod
+    async def authentication(cls, session: AsyncSession, token: str):
+        try:
+            data = jwt.decode(token, key=os.getenv('JWT'), algorithms="HS256")
+            data = Auth.model_validate(data)
+        except jwt.InvalidTokenError:
+            raise HTTPException(
+                status_code=400, detail="Invalid jwt token"
+            )
+        except pydantic.ValidationError:
+            raise HTTPException(
+                status_code=422, detail="Validation error"
+            )
+
+        user = await UserDataQ.user(session, data.telegram_id)
+
+        if user.hash is not None and not pbkdf2_sha256.verify(data.password, user.hash):
+            raise HTTPException(
+                status_code=401, detail="Wrong password"
+            )
+
+
+class UserDataQ:
+    @classmethod
+    async def user(cls, session: AsyncSession, telegram_id: int):
+        user = await session.get(User, ident=telegram_id)
+        if user is None:
+            raise HTTPException(
+                status_code=404, detail="User not found"
+            )
+        return user
+
+    @classmethod
+    async def get_user_email(cls, session: AsyncSession, telegram_id: int):
+        return session.execute(select(User.email).where(User.telegram_id == telegram_id))
+
+    @classmethod
+    async def update_password(cls, session: AsyncSession, telegram_id: int, hash_: str):
+        async with session.begin():
+            await session.execute(update(User).where(User.telegram_id == telegram_id).values({"password": hash_}))
+
+    @classmethod
+    async def invert_user_notifications(cls, session: AsyncSession, telegram_id: int):
+        async with session.begin():
+            notifications = (await session.execute(select(User.notifications).where(User.telegram_id == telegram_id))).scalar()
+            await session.execute(update(User).where(User.telegram_id == telegram_id).values({"notifications": not notifications}))
+        return "1" if not notifications else '0'
+
+
+class HabitsQ:
+    @staticmethod
+    async def create(
+            session: AsyncSession,
+            data: HabitM
+    ):
+        await session.execute(insert(Habit).values(**data.model_dump()))
+
+    @staticmethod
+    async def is_name_using(session: AsyncSession, telegram_id: int, name: str):
+        return (await session.execute(
+            select(Habit)
+            .filter(Habit.user_id == telegram_id, Habit.name == name)
+        )).one_or_none() is not None
+
+    @staticmethod
+    async def get_user_habits(session: AsyncSession, telegram_id: int):
+        return (await session.execute(
+            select(Habit)
+            .where(Habit.user_id == telegram_id)
+        )).scalars()
+
+    @staticmethod
+    async def update_name(session: AsyncSession, telegram_id: int, old_name: str, new_name: str):
+        await session.execute(
+            update(Habit)
+            .values({'name': new_name})
+            .filter(Habit.user_id == telegram_id, Habit.name == old_name)
         )
-    return user
-
-
-async def get_user_email(session: AsyncSession, telegram_id: int):
-    return session.execute(select(User.email).where(User.telegram_id == telegram_id))
-
-
-async def update_user_
-
-
-async def sign_up(session: AsyncSession, telegram_id: int):
-    try:
-        await session.execute(insert(User).values({"telegram_id": telegram_id}))
         await session.commit()
-    except IntegrityError:
-        raise HTTPException(409, "User already exists")
 
-
-async def authorization(session: AsyncSession, token: str):
-    try:
-        data = jwt.decode(token, key=os.getenv('JWT'), algorithms="HS256")
-        data = Auth.model_validate(data)
-    except jwt.InvalidTokenError:
-        raise HTTPException(
-            status_code=400, detail="Invalid jwt token"
+    @staticmethod
+    async def update_description(session: AsyncSession, telegram_id: int, name: str, description: str):
+        await session.execute(
+            update(Habit)
+            .values({'description': description})
+            .filter(Habit.user_id == telegram_id, Habit.name == name)
         )
-    except pydantic.ValidationError:
-        raise HTTPException(
-            status_code=422, detail="Validation error"
+        await session.commit()
+
+    @staticmethod
+    async def invert_completed(session: AsyncSession, telegram_id: int, name: str):
+        habit = (await session.execute(
+            select(Habit.completed)
+            .filter(Habit.user_id == telegram_id, Habit.name == name)
+        )).scalar()
+
+        await session.execute(
+            update(Habit)
+            .values({'completed': not habit.completed})
+            .filter(Habit.user_id == telegram_id, Habit.name == name)
+
         )
+        await session.commit()
 
-    user = await get_user(session, data.telegram_id)
+    # @staticmethod
+    # async def is_over(session: AsyncSession):
 
-    if user.hash is not None and not pbkdf2_sha256.verify(data.password, user.hash):
-        raise HTTPException(
-            status_code=401, detail="Wrong password"
-        )
-
-
-async def update_password(session: AsyncSession, telegram_id: int, hash_: str):
-    async with session.begin():
-        await session.execute(update(User).where(User.telegram_id == telegram_id).values({"password": hash_}))
-
-async def invert_user_notifications(session: AsyncSession, telegram_id: int):
-    async with session.begin():
-        notifications = (await session.execute(select(User.notifications).where(User.telegram_id == telegram_id))).scalar()
-        await session.execute(update(User).where(User.telegram_id == telegram_id).values({"notifications": not notifications}))
-    return "1" if not notifications else '0'
+    # @staticmethod
+    # async def update_border(session: AsyncSession, telegram_id: int, name: str, new_border: int):
+    #     await session.execute(select(Habit.progress, Habit.border_progress))
+    #     await session.execute(
+    #         update(Habit.border_progress)
+    #         .filter(Habit.user_id == telegram_id, Habit.name == name)
+    #
+    #     )
+    @staticmethod
+    async def increase_progress(session: AsyncSession):
+        await session.execute(update(Habit).filter(Habit.progress + 1 <= Habit.border_progress))
+        await session.commit()

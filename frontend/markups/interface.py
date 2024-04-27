@@ -4,9 +4,10 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 
 from frontend import bot
-from frontend.markups import SerializableMixin, Markup
+from frontend.markups import Markup, Habits
 from frontend.markups.auth import InputNewPassword, SignInWithPassword, PasswordResume, InputEmail, \
     RepeatNewPassword, InputVerifyEmailCode
+from frontend.markups.core import SerializableMixin
 from frontend.markups.profile import Profile
 from frontend.markups.title_screen import TitleScreen
 
@@ -21,6 +22,7 @@ class Interface(SerializableMixin):
         self.input_email = InputEmail(self)
         self.input_verify_email_code = InputVerifyEmailCode(self)
         self.sign_in_with_password = SignInWithPassword(self)
+        self.habits = Habits(self)
 
         self._chat_id = chat_id
 
