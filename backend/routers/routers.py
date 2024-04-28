@@ -4,9 +4,8 @@ from passlib.handlers.pbkdf2 import pbkdf2_sha256
 
 from backend.database import Session
 from backend.routers.models import Auth, TelegramId, UpdatePassword
-from backend.database.queries import authentication, update_password, sign_up, get_user, get_user_email, \
-    invert_user_notifications
-from fastapi import FastAPI, Header, HTTPException
+from backend.database.queries import AuthQ, HabitsQ, UserDataQ
+from fastapi import FastAPI, Header, HTTPException, Request
 from typing import Annotated
 from backend.mailing import send_new_password
 
@@ -36,8 +35,8 @@ async def authorization(auth: Auth):
 @app.patch('/update_password')
 async def update_password_(update_password__: UpdatePassword, Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
-        await authentication(session, Authorization)
-        await update_password(session, **update_password__.model_dump())
+        await AuthQ.authentication(session, Authorization)
+        await UserDataQ.update_password(session, **update_password__.model_dump())
 
 
 @app.patch("/reset_password")
@@ -61,6 +60,18 @@ async def invert_notification(telegram_id: TelegramId):
 @app.get('/show_up')
 async def show_up(Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
-        await authentication(session, Authorization)
+        telegram_id = await AuthQ.authentication(session, Authorization)
+        return await HabitsQ.get_user_habits(session, telegram_id)
+
+
+@app.middleware('http')
+async def error_abyss(request: Request, call_next):
+    try:
+        return call_next(request)
+    except Exception:
+        e
+
+
+
 
 

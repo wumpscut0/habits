@@ -8,6 +8,8 @@ from aiogram.types import InputMediaPhoto
 from aiogram.utils.formatting import as_list, Text, Bold, Italic
 from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardButton
 from config import *
+from frontend import errors
+from frontend.markups import Interface
 
 
 class Hidden:
@@ -143,12 +145,6 @@ class ButtonWidget(Hidden):
             self._mark = mark
 
 
-class CommonTexts:
-    @staticmethod
-    def feedback():
-        return DataTextWidget('📝 Feedback', active=False)
-
-
 class CommonButtons:
     @staticmethod
     def accept(callback_data: str | CallbackData, text='Accept'):
@@ -186,43 +182,44 @@ class WithPhotoMixin:
 
 
 class Markup(ABC):
-    def __init__(self):
-        self._init()
-        self._state = None
-
-    def _init(self):
+    def __init__(self, interface: Interface):
+        self._interface = interface
         self._init_state()
         self._init_text_map()
         self._init_markup_map()
+        self._base_text_map = {
+            "feedback": DataTextWidget('📝 Feedback', active=False)
+        }
 
     def _init_state(self):
-        self._state = None
+        """
+        Contract schema: self.state = State
+        """
+        self.state = None
 
     @abstractmethod
     def _init_text_map(self):
+        """
+        Contract schema: self._text_map = Dict[str, DataTextWidget | TextWidget]
+        """
         self._text_map: Dict[str, DataTextWidget | TextWidget] = {}
 
     def _init_markup_map(self):
+        """
+        Contract schema: self._markup_map = List[Dict[str, ButtonWidget]]
+        """
         self._markup_map: List[Dict[str, ButtonWidget]] = [{}]
 
-    @property
-    def state(self):
-        return self._state
+    async def open(self, state):
+        await self._interface.update(state, self)
+        await self._base_text_map['feedback'].reset()
 
-    @state.setter
-    def state(self, state: State):
-        self._state = state
-
-    @property
-    def text_map(self):
-        return self._text_map
-
-    @property
-    def markup_map(self):
-        return self._markup_map
+    async def update_feedback(self, data: str):
+        await self._base_text_map['feedback'].update_text(data=data)
 
     @property
     async def text(self):
+        self._text_map.update(self._base_text_map)
         return (as_list(*[row.text for row in self._text_map.values() if row.active])).as_html()
 
     @property
@@ -235,6 +232,14 @@ class Markup(ABC):
         for row in self._markup_map:
             for button in row.values():
                 await button.reset()
+
+    async def abort(self, state):
+        self._interface.title_screen.open(state)
+
+    async def handling_unexpected_error(self, state):
+        errors.error('')
+        await self.update_feedback('Internal server error.')
+        await self.open(state)
 
 
 # class Markup(ABC):

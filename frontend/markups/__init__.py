@@ -5,4 +5,6 @@ from config import Emoji
 from frontend.markups.habits import Habits
 from frontend.markups.interface import Interface
 from frontend.markups.auth import InputNewPassword, SignInWithPassword
-from frontend.markups.core import Markup, TextWidget, DataTextWidget, ButtonWidget, CommonTexts, CommonButtons
+from frontend.markups.core import Markup, TextWidget, DataTextWidget, ButtonWidget, CommonButtons
+from frontend.FSM import States
+from frontend import bot

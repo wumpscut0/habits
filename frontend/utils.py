@@ -6,6 +6,8 @@ from base64 import b64decode
 import aiosmtplib
 from email.mime.text import MIMEText
 
+from frontend import bot
+
 SMTP_SERVER = 'smtp.mail.ru'
 MAIL_ADDRESS = os.getenv('ORGANIZATION_MAIL')
 PORT = 465
@@ -30,3 +32,6 @@ async def verify_email(receiver):
                                start_tls=True) as session:
         await session.sendmail(MAIL_ADDRESS, receiver, message.as_string())
     return verify_code
+
+
+

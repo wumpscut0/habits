@@ -11,8 +11,7 @@ from frontend.markups.auth import InputNewPassword, SignInWithPassword
 
 class Profile(Markup):
     def __init__(self, interface: Interface):
-        super().__init__()
-        self._interface = interface
+        super().__init__(interface)
 
     def _init_text_map(self):
         self._text_map = {
@@ -22,16 +21,17 @@ class Profile(Markup):
     def _init_markup_map(self):
         self._markup_map = [
             {
-                "habits": ButtonWidget("🧠 Habits", "habits")
+                "habits": ButtonWidget(f"{Emoji.DIAGRAM} Show up current targets", "habits"),
+                "create_habit": ButtonWidget(f'f{Emoji.SPROUT} Create new target', 'create_habit')
             },
             {
-                "update_password": ButtonWidget("🔑 Add password", "input_new_password")
+                "update_password": ButtonWidget(f"{Emoji.KEY} Add password", "update_password")
             },
             {
-                "exit": ButtonWidget(f'{Emoji.BACK} Exit', "title_screen")
+                "title_screen": ButtonWidget(f'{Emoji.BACK} Exit', "title_screen")
             }
         ]
 
-    async def open_profile(self, name, state):
-        await self._text_map['hello'].update_text(data=name)
-        await self._interface.update(state, self)
+    async def open(self, state):
+        await self._text_map['hello'].update_text(data=self._interface.first_name)
+        await super().open(state)

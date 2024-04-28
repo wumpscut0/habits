@@ -10,4 +10,4 @@ async def open_profile(callback: CallbackQuery, interface: Interface, state: FSM
 
 @profile_router.callback_query(F.data == 'habits')
 async def open_habits(callback: CallbackQuery, interface: Interface, state: FSMContext):
-    await interface.habits
+    await interface.habits.

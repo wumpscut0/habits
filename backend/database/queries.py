@@ -41,6 +41,7 @@ class AuthQ:
             raise HTTPException(
                 status_code=401, detail="Wrong password"
             )
+        return user.telegram_id
 
 
 class UserDataQ:
@@ -65,8 +66,10 @@ class UserDataQ:
     @classmethod
     async def invert_user_notifications(cls, session: AsyncSession, telegram_id: int):
         async with session.begin():
-            notifications = (await session.execute(select(User.notifications).where(User.telegram_id == telegram_id))).scalar()
-            await session.execute(update(User).where(User.telegram_id == telegram_id).values({"notifications": not notifications}))
+            notifications = (
+                await session.execute(select(User.notifications).where(User.telegram_id == telegram_id))).scalar()
+            await session.execute(
+                update(User).where(User.telegram_id == telegram_id).values({"notifications": not notifications}))
         return "1" if not notifications else '0'
 
 
@@ -87,10 +90,12 @@ class HabitsQ:
 
     @staticmethod
     async def get_user_habits(session: AsyncSession, telegram_id: int):
-        return (await session.execute(
-            select(Habit)
-            .where(Habit.user_id == telegram_id)
-        )).scalars()
+        return {'habits': [
+            habit.as_dict_() for habit in (await session.execute(
+                select(Habit)
+                .where(Habit.user_id == telegram_id)
+            )).scalars()
+        ]}
 
     @staticmethod
     async def update_name(session: AsyncSession, telegram_id: int, old_name: str, new_name: str):
@@ -125,17 +130,6 @@ class HabitsQ:
         )
         await session.commit()
 
-    # @staticmethod
-    # async def is_over(session: AsyncSession):
-
-    # @staticmethod
-    # async def update_border(session: AsyncSession, telegram_id: int, name: str, new_border: int):
-    #     await session.execute(select(Habit.progress, Habit.border_progress))
-    #     await session.execute(
-    #         update(Habit.border_progress)
-    #         .filter(Habit.user_id == telegram_id, Habit.name == name)
-    #
-    #     )
     @staticmethod
     async def increase_progress(session: AsyncSession):
         await session.execute(update(Habit).filter(Habit.progress + 1 <= Habit.border_progress))

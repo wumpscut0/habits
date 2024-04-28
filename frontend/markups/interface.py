@@ -13,7 +13,7 @@ from frontend.markups.title_screen import TitleScreen
 
 
 class Interface(SerializableMixin):
-    def __init__(self, chat_id: int):
+    def __init__(self, chat_id: int, first_name: str):
         self.title_screen = TitleScreen(self)
         self.profile = Profile(self)
         self.input_password = InputNewPassword(self)
@@ -24,25 +24,15 @@ class Interface(SerializableMixin):
         self.sign_in_with_password = SignInWithPassword(self)
         self.habits = Habits(self)
 
-        self._chat_id = chat_id
+        self.first_name = first_name
+        self.chat_id = chat_id
 
         self._current_markup = None
+
         self._trash = []
 
-        self._token = None
+        self.token = None
         self._message_id = None
-
-    @property
-    def chat_id(self):
-        return self._chat_id
-
-    @property
-    def token(self):
-        return self._token
-
-    @token.setter
-    def token(self, token: str):
-        self._token = token
 
     async def open_session(self, state, close_msg='Session close'):
         await state.set_state(None)
@@ -50,7 +40,7 @@ class Interface(SerializableMixin):
 
         try:
             message = await bot.edit_message_text(
-                chat_id=self._chat_id,
+                chat_id=self.chat_id,
                 message_id=self._message_id,
                 text=close_msg
             )
@@ -59,7 +49,7 @@ class Interface(SerializableMixin):
             return 'Open session not found'
 
         message = await bot.send_message(
-            chat_id=self._chat_id,
+            chat_id=self.chat_id,
             text=await self.title_screen.text,
             reply_markup=await self.title_screen.markup
         )
@@ -72,7 +62,7 @@ class Interface(SerializableMixin):
         self.token = None
 
         await bot.edit_message_text(
-            chat_id=self._chat_id,
+            chat_id=self.chat_id,
             text=await self.title_screen.text,
             reply_markup=await self.title_screen.markup,
             message_id=self._message_id
@@ -85,7 +75,7 @@ class Interface(SerializableMixin):
         await state.set_state(markup.state)
         await self._update_interface_in_redis(state)
         await bot.edit_message_text(
-            chat_id=self._chat_id,
+            chat_id=self.chat_id,
             message_id=self._message_id,
             text=await markup.text,
             reply_markup=await markup.markup
@@ -95,10 +85,10 @@ class Interface(SerializableMixin):
     async def clean_trash(self):
         for message_id in self._trash:
             try:
-                await bot.delete_message(self._chat_id, message_id)
+                await bot.delete_message(self.chat_id, message_id)
             except TelegramBadRequest:
                 try:
-                    await bot.edit_message_text('deleted', self._chat_id, message_id)
+                    await bot.edit_message_text('deleted', self.chat_id, message_id)
                 except TelegramBadRequest:
                     pass
         self._trash = []
