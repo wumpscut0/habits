@@ -16,8 +16,8 @@ class Auth(BaseModel):
 
 
 class UpdatePassword(BaseModel):
-    telegram_id: int
     hash: str
+    email: str | None = None
 
 
 class HabitM(BaseModel):

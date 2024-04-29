@@ -3,13 +3,14 @@ import jwt
 from passlib.handlers.pbkdf2 import pbkdf2_sha256
 
 from backend.database import Session
-from backend.routers.models import Auth, TelegramId, UpdatePassword
+from backend.routers.models import Auth, TelegramId, UpdatePassword, HabitM
 from backend.database.queries import AuthQ, HabitsQ, UserDataQ
 from fastapi import FastAPI, Header, HTTPException, Request
 from typing import Annotated
 from backend.mailing import send_new_password
 
 from backend.routers.utils import verify_password
+from loggers import errors
 
 app = FastAPI()
 
@@ -35,8 +36,10 @@ async def authorization(auth: Auth):
 @app.patch('/update_password')
 async def update_password_(update_password__: UpdatePassword, Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
-        await AuthQ.authentication(session, Authorization)
-        await UserDataQ.update_password(session, **update_password__.model_dump())
+        telegram_id = await AuthQ.authentication(session, Authorization)
+        await UserDataQ.update_password(session, telegram_id, update_password__.hash)
+        if update_password__.email is not None:
+            await UserDataQ.update_email(session, telegram_id, update_password__.email)
 
 
 @app.patch("/reset_password")
@@ -64,12 +67,37 @@ async def show_up(Authorization: Annotated[str, Header()]):
         return await HabitsQ.get_user_habits(session, telegram_id)
 
 
+@app.get("/has_a_mail")
+async def has_a_mail(Authorization: Annotated[str, Header()]):
+    async with Session.begin() as session:
+        telegram_id = await AuthQ.authentication(session, Authorization)
+        return {
+            "email": UserDataQ.get_user_email(session, telegram_id.telegram_id)
+        }
+
+
+@app.get('/is_name_using')
+async def is_name_using(name: str, Authorization: Annotated[str, Header()]):
+    async with Session.begin() as session:
+        telegram_id = await AuthQ.authentication(session, Authorization)
+        await HabitsQ.is_name_using(session,  telegram_id, name)
+
+
+@app.post('/create_habit')
+async def create_habit(habit: HabitM, Authorization: Annotated[str, Header()]):
+    async with Session.begin() as session:
+        telegram_id = await AuthQ.authentication(session, Authorization)
+        await HabitsQ.create(session, habit)
+
+
 @app.middleware('http')
 async def error_abyss(request: Request, call_next):
     try:
         return call_next(request)
-    except Exception:
-        e
+    except Exception as e:
+        errors.error(e)
+        raise HTTPException(500, e)
+
 
 
 

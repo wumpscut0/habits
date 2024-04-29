@@ -1,14 +1,12 @@
 import pickle
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from base64 import b64encode
 from typing import List, Dict
 from aiogram.filters.callback_data import CallbackData
-from aiogram.fsm.state import State
 from aiogram.types import InputMediaPhoto
 from aiogram.utils.formatting import as_list, Text, Bold, Italic
 from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardButton
 from config import *
-from frontend import errors
 from frontend.markups import Interface
 
 
@@ -200,15 +198,15 @@ class Markup(ABC):
     @abstractmethod
     def _init_text_map(self):
         """
-        Contract schema: self._text_map = Dict[str, DataTextWidget | TextWidget]
+        Contract schema: self.text_map = Dict[str, DataTextWidget | TextWidget]
         """
-        self._text_map: Dict[str, DataTextWidget | TextWidget] = {}
+        self.text_map: Dict[str, DataTextWidget | TextWidget] = {}
 
     def _init_markup_map(self):
         """
-        Contract schema: self._markup_map = List[Dict[str, ButtonWidget]]
+        Contract schema: self.markup_map = List[Dict[str, ButtonWidget]]
         """
-        self._markup_map: List[Dict[str, ButtonWidget]] = [{}]
+        self.markup_map: List[Dict[str, ButtonWidget]] = [{}]
 
     async def open(self, state):
         await self._interface.update(state, self)
@@ -219,25 +217,30 @@ class Markup(ABC):
 
     @property
     async def text(self):
-        self._text_map.update(self._base_text_map)
-        return (as_list(*[row.text for row in self._text_map.values() if row.active])).as_html()
+        self.text_map.update(self._base_text_map)
+        return (as_list(*[row.text for row in self.text_map.values() if row.active])).as_html()
 
     @property
     async def markup(self):
-        return InlineKeyboardBuilder([[button.button for button in row.values() if button.active] for row in self._markup_map]).as_markup()
-
-    async def reset(self):
-        for widget in self._text_map.values():
-            await widget.reset()
-        for row in self._markup_map:
+        return InlineKeyboardBuilder([[button.button for button in row.values() if button.active] for row in self.markup_map]).as_markup()
+    
+    async def reset_text(self, active=False):
+        for widget in self.text_map.values():
+            await widget.reset(active)
+            
+    async def reset_markup(self, active=False):
+        for row in self.markup_map:
             for button in row.values():
-                await button.reset()
+                await button.reset(active)
+    
+    async def reset_all(self, active=False):
+        await self.reset_text(active)
+        await self.reset_markup(active)
 
-    async def abort(self, state):
+    async def abort_session(self, state):
         self._interface.title_screen.open(state)
 
     async def handling_unexpected_error(self, state):
-        errors.error('')
         await self.update_feedback('Internal server error.')
         await self.open(state)
 
@@ -249,18 +252,18 @@ class Markup(ABC):
 #
 #     def _init(self):
 #         self._init_state()
-#         self._init_text_map()
-#         self._init_markup_map()
+#         self._inittext_map()
+#         self._initmarkup_map()
 #
 #     def _init_state(self):
 #         self._state = None
 #
 #     @abstractmethod
-#     def _init_text_map(self):
-#         self._text_map: Dict[str, DataTextWidget | TextWidget] = {}
+#     def _inittext_map(self):
+#         self.text_map: Dict[str, DataTextWidget | TextWidget] = {}
 #
-#     def _init_markup_map(self):
-#         self._markup_map: List[Dict[str, ButtonWidget]] = [{}]
+#     def _initmarkup_map(self):
+#         self.markup_map: List[Dict[str, ButtonWidget]] = [{}]
 #
 #     @property
 #     def state(self):
@@ -272,31 +275,31 @@ class Markup(ABC):
 #
 #     @property
 #     def text_map(self):
-#         return self._text_map
+#         return self.text_map
 #
 #     @property
 #     def markup_map(self):
-#         return self._markup_map
+#         return self.markup_map
 #
 #     @property
 #     async def text(self):
-#         return (as_list(*[row.text for row in self._text_map.values() if row.active])).as_html()
+#         return (as_list(*[row.text for row in self.text_map.values() if row.active])).as_html()
 #
 #     @property
 #     async def markup(self):
-#         return InlineKeyboardBuilder([[button.button for button in row.values() if button.active] for row in self._markup_map]).as_markup()
+#         return InlineKeyboardBuilder([[button.button for button in row.values() if button.active] for row in self.markup_map]).as_markup()
 #
 #     async def reset(self):
-#         for widget in self._text_map.values():
+#         for widget in self.text_map.values():
 #             await widget.reset()
-#         for row in self._markup_map:
+#         for row in self.markup_map:
 #             for button in row.values():
 #                 await button.reset()
 
 
 # class TextMap(ABC):
 #     def __init__(self):
-#         self._text_map = None
+#         self.text_map = None
 #
 #
 #     @property

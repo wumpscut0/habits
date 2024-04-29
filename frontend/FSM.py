@@ -25,4 +25,5 @@ class States(StatesGroup):
     input_verify_email_code = State()
     sign_in_with_password = State()
     input_habit_name = State()
+    input_habit_border = State()
 

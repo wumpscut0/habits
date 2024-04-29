@@ -13,16 +13,16 @@ from passlib.hash import pbkdf2_sha256
 
 
 class AuthQ:
-    @classmethod
-    async def registration(cls, session: AsyncSession, telegram_id: int):
+    @staticmethod
+    async def registration(session: AsyncSession, telegram_id: int):
         try:
             await session.execute(insert(User).values({"telegram_id": telegram_id}))
             await session.commit()
         except IntegrityError:
             raise HTTPException(409, "User already exists")
 
-    @classmethod
-    async def authentication(cls, session: AsyncSession, token: str):
+    @staticmethod
+    async def authentication(session: AsyncSession, token: str):
         try:
             data = jwt.decode(token, key=os.getenv('JWT'), algorithms="HS256")
             data = Auth.model_validate(data)
@@ -56,12 +56,17 @@ class UserDataQ:
 
     @classmethod
     async def get_user_email(cls, session: AsyncSession, telegram_id: int):
-        return session.execute(select(User.email).where(User.telegram_id == telegram_id))
+        return (await session.execute(select(User.email).where(User.telegram_id == telegram_id))).scalar()
 
     @classmethod
     async def update_password(cls, session: AsyncSession, telegram_id: int, hash_: str):
         async with session.begin():
             await session.execute(update(User).where(User.telegram_id == telegram_id).values({"password": hash_}))
+
+    @classmethod
+    async def update_email(cls, session: AsyncSession, telegram_id: int, email: str):
+        async with session.begin():
+            await session.execute(update(User).where(User.telegram_id == telegram_id).values({"email": email}))
 
     @classmethod
     async def invert_user_notifications(cls, session: AsyncSession, telegram_id: int):
@@ -74,19 +79,22 @@ class UserDataQ:
 
 
 class HabitsQ:
-    @staticmethod
+    @classmethod
     async def create(
+            cls,
             session: AsyncSession,
             data: HabitM
     ):
+        await cls.is_name_using(session, data.user_id, data.name)
         await session.execute(insert(Habit).values(**data.model_dump()))
 
-    @staticmethod
-    async def is_name_using(session: AsyncSession, telegram_id: int, name: str):
-        return (await session.execute(
+    @classmethod
+    async def is_name_using(cls, session: AsyncSession, telegram_id: int, name: str):
+        if (await session.execute(
             select(Habit)
             .filter(Habit.user_id == telegram_id, Habit.name == name)
-        )).one_or_none() is not None
+        )).one_or_none() is not None:
+            raise HTTPException(409, f'You have habit with the {name} name.')
 
     @staticmethod
     async def get_user_habits(session: AsyncSession, telegram_id: int):

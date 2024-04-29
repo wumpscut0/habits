@@ -8,6 +8,7 @@ from frontend.markups import Markup, Habits
 from frontend.markups.auth import InputNewPassword, SignInWithPassword, PasswordResume, InputEmail, \
     RepeatNewPassword, InputVerifyEmailCode
 from frontend.markups.core import SerializableMixin
+from frontend.markups.habits import InputHabitName, InputHabitBorder
 from frontend.markups.profile import Profile
 from frontend.markups.title_screen import TitleScreen
 
@@ -23,6 +24,8 @@ class Interface(SerializableMixin):
         self.input_verify_email_code = InputVerifyEmailCode(self)
         self.sign_in_with_password = SignInWithPassword(self)
         self.habits = Habits(self)
+        self.input_habit_name = InputHabitName(self)
+        self.input_habit_border = InputHabitBorder(self)
 
         self.first_name = first_name
         self.chat_id = chat_id
