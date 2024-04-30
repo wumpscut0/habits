@@ -58,6 +58,7 @@ class DataTextWidget(Hidden):
             data: str = '❔',
             mark: str = '',
             sep: str = ': ',
+            end: str = '',
             active=True
     ):
         super().__init__(active)
@@ -65,6 +66,7 @@ class DataTextWidget(Hidden):
         self._data = data
         self._mark = mark
         self._sep = sep
+        self._end = ''
         self._default_mark = self._mark
         self._default_data = self._data
 
@@ -74,7 +76,7 @@ class DataTextWidget(Hidden):
     @property
     def text(self):
         separator = '' if str(self._header).startswith(' ') else ' '
-        return Text(self._mark) + Text(separator) + Bold(self._header) + Text(self._sep) + Italic(self._data)
+        return Text(self._mark) + Text(separator) + Bold(self._header) + Text(self._sep) + Italic(self._data) + Italic(self._end)
 
     @property
     def data(self):

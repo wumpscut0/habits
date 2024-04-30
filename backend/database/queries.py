@@ -2,7 +2,7 @@ import os
 import jwt
 import pydantic
 from fastapi import HTTPException
-from sqlalchemy import update, insert, select, and_
+from sqlalchemy import update, insert, select, and_, delete
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -10,6 +10,20 @@ from sqlalchemy.orm import selectinload
 from backend.database.models import User, Habit
 from backend.routers.models import Auth, HabitM
 from passlib.hash import pbkdf2_sha256
+
+
+async def decode_jwt(token: str):
+    try:
+        data = jwt.decode(token, key=os.getenv('JWT'), algorithms="HS256")
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=400, detail="Invalid jwt token"
+        )
+    except pydantic.ValidationError:
+        raise HTTPException(
+            status_code=422, detail="Validation error"
+        )
+    return data
 
 
 class AuthQ:
@@ -23,17 +37,7 @@ class AuthQ:
 
     @staticmethod
     async def authentication(session: AsyncSession, token: str):
-        try:
-            data = jwt.decode(token, key=os.getenv('JWT'), algorithms="HS256")
-            data = Auth.model_validate(data)
-        except jwt.InvalidTokenError:
-            raise HTTPException(
-                status_code=400, detail="Invalid jwt token"
-            )
-        except pydantic.ValidationError:
-            raise HTTPException(
-                status_code=422, detail="Validation error"
-            )
+        data = Auth.model_validate(await decode_jwt(token))
 
         user = await UserDataQ.user(session, data.telegram_id)
 
@@ -79,64 +83,63 @@ class UserDataQ:
 
 
 class HabitsQ:
-    @classmethod
+    @staticmethod
     async def create(
-            cls,
-            session: AsyncSession,
-            data: HabitM
+        session: AsyncSession,
+        data: HabitM,
+        telegram_id: int
     ):
-        await cls.is_name_using(session, data.user_id, data.name)
-        await session.execute(insert(Habit).values(**data.model_dump()))
+        await session.execute(insert(Habit).values({"user_id": telegram_id}, **data.model_dump()))
 
-    @classmethod
-    async def is_name_using(cls, session: AsyncSession, telegram_id: int, name: str):
-        if (await session.execute(
-            select(Habit)
-            .filter(Habit.user_id == telegram_id, Habit.name == name)
-        )).one_or_none() is not None:
-            raise HTTPException(409, f'You have habit with the {name} name.')
+    @staticmethod
+    async def delete(
+        session: AsyncSession,
+        habit_id: int
+    ):
+        await session.execute(delete(Habit).where(Habit.id == habit_id))
 
     @staticmethod
     async def get_user_habits(session: AsyncSession, telegram_id: int):
-        return {'habits': [
+        return [
             habit.as_dict_() for habit in (await session.execute(
                 select(Habit)
-                .where(Habit.user_id == telegram_id)
+                .filter(Habit.user_id == telegram_id, Habit.progress != Habit.border_progress)
             )).scalars()
-        ]}
+        ]
 
     @staticmethod
-    async def update_name(session: AsyncSession, telegram_id: int, old_name: str, new_name: str):
+    async def update_name(session: AsyncSession, telegram_id: int, habit_id: int, name: str):
         await session.execute(
             update(Habit)
-            .values({'name': new_name})
-            .filter(Habit.user_id == telegram_id, Habit.name == old_name)
+            .values({'name': name})
+            .filter(Habit.user_id == telegram_id, Habit.id == habit_id)
         )
         await session.commit()
 
     @staticmethod
-    async def update_description(session: AsyncSession, telegram_id: int, name: str, description: str):
+    async def update_description(session: AsyncSession, telegram_id: int, habit_id: int, description: str):
         await session.execute(
             update(Habit)
             .values({'description': description})
-            .filter(Habit.user_id == telegram_id, Habit.name == name)
+            .filter(Habit.user_id == telegram_id, Habit.id == habit_id)
         )
         await session.commit()
 
     @staticmethod
-    async def invert_completed(session: AsyncSession, telegram_id: int, name: str):
+    async def invert_completed(session: AsyncSession, telegram_id: int, habit_id: int):
         habit = (await session.execute(
             select(Habit.completed)
-            .filter(Habit.user_id == telegram_id, Habit.name == name)
+            .filter(Habit.user_id == telegram_id, Habit.id == habit_id)
         )).scalar()
 
         await session.execute(
             update(Habit)
             .values({'completed': not habit.completed})
-            .filter(Habit.user_id == telegram_id, Habit.name == name)
+            .filter(Habit.user_id == telegram_id, Habit.id == habit_id)
 
         )
         await session.commit()
+        return '1' if habit.completed else '0'
 
     @staticmethod
     async def increase_progress(session: AsyncSession):

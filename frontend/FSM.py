@@ -26,4 +26,6 @@ class States(StatesGroup):
     sign_in_with_password = State()
     input_habit_name = State()
     input_habit_border = State()
+    update_habit_name = State()
+    update_habit_description = State()
 

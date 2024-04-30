@@ -4,7 +4,7 @@ from aiohttp import ClientSession
 
 from config import Emoji
 from frontend.markups import Markup, ButtonWidget, CommonButtons, DataTextWidget, TextWidget
-from frontend.markups.habits import Habits
+
 from frontend.markups.interface import Interface
 from frontend.markups.auth import InputNewPassword, SignInWithPassword
 
@@ -21,8 +21,7 @@ class Profile(Markup):
     def _init_markup_map(self):
         self.markup_map = [
             {
-                "habits": ButtonWidget(f"{Emoji.DIAGRAM} Show up current targets", "habits"),
-                "create_habit": ButtonWidget(f'f{Emoji.SPROUT} Create new target', 'create_habit')
+                "habits": ButtonWidget(f"{Emoji.DIAGRAM} Targets", "habits"),
             },
             {
                 "options": ButtonWidget(f'{Emoji.GEAR️} Options', "options")

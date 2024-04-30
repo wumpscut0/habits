@@ -4,8 +4,9 @@ from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, Update
 from aiohttp import ClientSession
 
-from frontend.main import remainder
+from frontend.main import scheduler
 from frontend.markups.interface import Interface
+from frontend.markups.remainder import remainder
 from frontend.utils import deserialize
 
 
@@ -31,7 +32,7 @@ class CommonMiddleware(BaseMiddleware):
                 await session.post('/sign_up', json={'telegram_id': event.message.from_user.id})
 
                 current_data['interface'] = await Interface(event.message.chat.id, event.message.from_user.first_name).serialize()
-                remainder.add_job(func=, replace_existing=True)
+                scheduler.add_job(func=remainder, args=(event.message.chat.id,), replace_existing=True)
                 interface = await deserialize(current_data['interface'])
             else:
                 if event.message is not None:

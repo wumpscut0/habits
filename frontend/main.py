@@ -6,6 +6,7 @@ from apscheduler.executors.pool import ThreadPoolExecutor
 from pytz import utc
 
 from frontend import bot
+from frontend.markups.remainder import increase_progress
 from frontend.routers.abyss import abyss_router
 from frontend.middlewares import CommonMiddleware
 from frontend.routers.profile import profile_router
@@ -30,12 +31,13 @@ job_defaults = {
     'max_instances': 1
 }
 
-remainder = AsyncIOScheduler()
-remainder.configure(jobstores=jobstores, executors=executors, job_defaults=job_defaults, timezone=utc)
+scheduler = AsyncIOScheduler()
+scheduler.configure(jobstores=jobstores, executors=executors, job_defaults=job_defaults, timezone=utc)
+scheduler.add_job(increase_progress, 'cron', hour=0)
 
 
 async def main():
-    await asyncio.gather(remainder.start(), dispatcher.start_polling(bot))
+    await asyncio.gather(scheduler.start(), dispatcher.start_polling(bot))
 
 
 if __name__ == '__main__':

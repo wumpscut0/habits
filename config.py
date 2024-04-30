@@ -29,3 +29,5 @@ class Emoji:
     PLUS = "➕"
     UP = "🆙"
     SKIP = "⏭️"
+    GREEN_BIG_SQUARE = "🟩"
+    RED_QUESTION = "❓"

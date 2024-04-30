@@ -4,7 +4,7 @@ from passlib.handlers.pbkdf2 import pbkdf2_sha256
 
 from backend.database import Session
 from backend.routers.models import Auth, TelegramId, UpdatePassword, HabitM
-from backend.database.queries import AuthQ, HabitsQ, UserDataQ
+from backend.database.queries import AuthQ, HabitsQ, UserDataQ, decode_jwt
 from fastapi import FastAPI, Header, HTTPException, Request
 from typing import Annotated
 from backend.mailing import send_new_password
@@ -60,7 +60,7 @@ async def invert_notification(telegram_id: TelegramId):
         return await invert_user_notifications(session, telegram_id.telegram_id)
 
 
-@app.get('/show_up')
+@app.get('/show_up_habits')
 async def show_up(Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
         telegram_id = await AuthQ.authentication(session, Authorization)
@@ -76,18 +76,47 @@ async def has_a_mail(Authorization: Annotated[str, Header()]):
         }
 
 
-@app.get('/is_name_using')
-async def is_name_using(name: str, Authorization: Annotated[str, Header()]):
-    async with Session.begin() as session:
-        telegram_id = await AuthQ.authentication(session, Authorization)
-        await HabitsQ.is_name_using(session,  telegram_id, name)
-
-
 @app.post('/create_habit')
 async def create_habit(habit: HabitM, Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
         telegram_id = await AuthQ.authentication(session, Authorization)
-        await HabitsQ.create(session, habit)
+        await HabitsQ.create(session, habit, telegram_id)
+
+
+@app.patch('/update_habit_name/{habit_id}')
+async def update_habit_name(habit_id: int, name: str, Authorization: Annotated[str, Header()]):
+    async with Session.begin() as session:
+        telegram_id = await AuthQ.authentication(session, Authorization)
+        await HabitsQ.update_name(session, telegram_id, habit_id, name)
+
+
+@app.patch('/update_habit_description/{habit_id}')
+async def update_habit_description(habit_id: int, description: str, Authorization: Annotated[str, Header()]):
+    async with Session.begin() as session:
+        telegram_id = await AuthQ.authentication(session, Authorization)
+        await HabitsQ.update_description(session, telegram_id, habit_id, description)
+
+
+@app.delete('/delete_habit/{habit_id}')
+async def delete_habit(habit_id: int, Authorization: Annotated[str, Header()]):
+    async with Session.begin() as session:
+        await AuthQ.authentication(session, Authorization)
+        await HabitsQ.delete(session, habit_id)
+
+
+@app.patch('/invert_habit_completed/{habit_id}')
+async def invert_habit_completed(habit_id: int, Authorization: Annotated[str, Header()]):
+    async with Session.begin() as session:
+        telegram_id = await AuthQ.authentication(session, Authorization)
+        return await HabitsQ.invert_completed(session, telegram_id, habit_id)
+
+
+@app.patch('/increase_habits_progress/{key}')
+async def increase_habits_progress(key: str):
+    if os.getenv('SERVICES_PASSWORD') != (await decode_jwt(key))['password']:
+        raise HTTPException(401)
+    async with Session.begin() as session:
+        await HabitsQ.increase_progress(session)
 
 
 @app.middleware('http')
@@ -96,7 +125,7 @@ async def error_abyss(request: Request, call_next):
         return call_next(request)
     except Exception as e:
         errors.error(e)
-        raise HTTPException(500, e)
+        raise HTTPException(500)
 
 
 
