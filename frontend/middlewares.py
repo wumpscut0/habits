@@ -1,13 +1,13 @@
 import os
 from typing import Callable, Dict, Any, Awaitable
+
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, Update
 from aiohttp import ClientSession
 
-from frontend.main import scheduler
+from frontend import deserialize, scheduler
 from frontend.markups.interface import Interface
 from frontend.markups.remainder import remainder
-from frontend.utils import deserialize
 
 
 class CommonMiddleware(BaseMiddleware):

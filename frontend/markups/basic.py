@@ -1,4 +1,68 @@
-from frontend.markups import *
+from aiogram.fsm.context import FSMContext
+from aiohttp import ClientSession
+
+from frontend.markups.core import *
+
+
+class BasicManager:
+    def __init__(self, interface: Interface):
+        self._interface = interface
+
+        self.title_screen = TitleScreen(interface)
+        self.profile = Profile(interface)
+
+
+class Profile(Markup):
+    def __init__(self, interface: Interface):
+        super().__init__(interface)
+
+    def _init_text_map(self):
+        self.text_map = {
+            "hello": DataTextWidget('Hello', sep=', '),
+        }
+
+    def _init_markup_map(self):
+        self.markup_map = [
+            {
+                "habits": ButtonWidget(f"{Emoji.DIAGRAM} Targets", "habits"),
+            },
+            {
+                "options": ButtonWidget(f'{Emoji.GEAR️} Options', "options")
+            },
+            {
+                "title_screen": ButtonWidget(f'{Emoji.BACK} Exit', "title_screen")
+            }
+        ]
+
+    async def open(self, state):
+        await self.text_map['hello'].update_text(data=self._interface.first_name)
+        await super().open(state)
+
+
+class Options(Markup):
+    def __init__(self, interface: Interface):
+        super().__init__(interface)
+
+    def _init_text_map(self):
+        self.text_map = {
+            "action": TextWidget(f'{Emoji.GEAR️} Choose option')
+        }
+
+    def _init_markup_map(self):
+        self.markup_map = [
+            {
+                "update_password": ButtonWidget(f"{Emoji.KEY}{Emoji.PLUS} Add password", "update_password"),
+                "delete_password": ButtonWidget(f"{Emoji.KEY}{Emoji.DENIAL} Remove password", "delete_password",
+                                                active=False)
+            },
+        ]
+
+
+
+from aiogram.fsm.context import FSMContext
+from aiohttp import ClientSession
+
+from frontend.markups.core import *
 
 
 class TitleScreen(Markup):

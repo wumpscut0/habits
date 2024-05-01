@@ -1,27 +1,34 @@
 import pytz
+from datetime import time
+
 from sqlalchemy import *
 from sqlalchemy.orm import DeclarativeBase, relationship
-from config import MAX_NAME_LENGTH, MAX_DESCRIPTION_LENGTH, MAX_EMAIL_LENGTH
-from datetime import time, tzinfo
+
+from backend import config
+
+MAX_EMAIL_LENGTH = config.get('limitations', 'MAX_EMAIL_LENGTH')
+MAX_NAME_LENGTH = config.get('limitations', 'MAX_NAME_LENGTH')
+MAX_DESCRIPTION_LENGTH = config.get('limitations', 'MAX_DESCRIPTION_LENGTH')
+
 
 class Base(DeclarativeBase):
     ...
 
 
-class User(Base):
+class UserORM(Base):
     __tablename__ = 'user'
     telegram_id = Column(BIGINT, primary_key=True, autoincrement=False, nullable=False)
     hash = Column(String, nullable=True)
     email = Column(VARCHAR(MAX_EMAIL_LENGTH), nullable=True, unique=True)
     notifications = Column(Boolean, default=True)
     notification_time = Column(Time, default=time(20, 0, tzinfo=pytz.utc))
-    habit = Column(Integer, ForeignKey('habit.id'))
+    target = Column(Integer, ForeignKey('target.id'))
 
-    habits = relationship('Habit')
+    targets = relationship('HabitORM')
 
 
-class Habit(Base):
-    __tablename__ = 'habit'
+class TargetORM(Base):
+    __tablename__ = 'target'
     id = Column(Integer, primary_key=True)
     name = Column(VARCHAR(MAX_NAME_LENGTH), nullable=False)
     description = Column(VARCHAR(MAX_DESCRIPTION_LENGTH), default='No description')
