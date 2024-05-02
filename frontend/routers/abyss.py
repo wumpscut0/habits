@@ -4,7 +4,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, BotCommand
 from aiogram.filters import Command
 
-from frontend.markups.interface import Interface
+from frontend.controller import Interface
 
 abyss_router = Router()
 

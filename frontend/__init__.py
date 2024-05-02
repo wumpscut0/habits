@@ -17,6 +17,7 @@ from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.redis import RedisJobStore
 
+from frontend.controller import Interface
 from frontend.routers.abyss import abyss_router
 from frontend.middlewares import CommonMiddleware
 from frontend.routers.profile import profile_router
@@ -30,6 +31,11 @@ async def increase_progress():
     signature = jwt.encode({"password": os.getenv('SERVICES_PASSWORD')}, os.getenv('JWT'))
     async with aiohttp.ClientSession() as session:
         await session.patch(os.getenv('BACKEND') + f'/increase_habits_progress/{signature}')
+
+
+async def reset_verify_code(interface):
+    interface.storage.update({"verify_code": None, "email": None})
+
 
 load_dotenv(find_dotenv())
 

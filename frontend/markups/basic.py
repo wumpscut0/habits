@@ -10,6 +10,7 @@ class BasicManager:
 
         self.title_screen = TitleScreen(interface)
         self.profile = Profile(interface)
+        self.options = Options(interface)
 
 
 class Profile(Markup):

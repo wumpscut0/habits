@@ -3,9 +3,7 @@ import secrets
 from string import digits
 from email.mime.text import MIMEText
 
-import aiohttp
 import aiosmtplib
-import jwt
 
 from frontend import config
 
@@ -67,3 +65,9 @@ class Emoji:
     SKIP = "⏭️"
     GREEN_BIG_SQUARE = "🟩"
     RED_QUESTION = "❓"
+    GREY_QUESTION = "❔"
+    BAN = "🚫"
+    GREEN_CIRCLE = "🟢"
+    YELLOW_CIRCLE = "🟡"
+    ORANGE_CIRCLE = "🟠"
+    RED_CIRCLE = "🔴"
