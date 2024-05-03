@@ -14,4 +14,5 @@ remainder_markup = InlineKeyboardMarkup(
     )
 
 async def remainder(chat_id: int):
-    bot.send_message(chat_id=chat_id, text=, reply_markup=remainder_markup)
+    # OFF THIS JOB IF USER DONE ALL
+    bot.send_message(chat_id=chat_id, text="", reply_markup=remainder_markup)

@@ -1,6 +1,7 @@
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from frontend import bot
+from frontend.markups import STANDARD_BORDER_RANGE
 from frontend.markups.auth import AuthManager
 from frontend.markups.basic import BasicManager
 from frontend.markups.core import SerializableMixin, TextMarkup, TextMap, DataTextWidget
@@ -16,7 +17,7 @@ class Interface(SerializableMixin):
         self.first_name = first_name
         self.chat_id = chat_id
         self.token = None
-        self.feedback = DataTextWidget('📝 Feedback', active=False)
+        self.feedback = DataTextWidget(header='📝 Feedback', active=False)
         self.storage = {}
 
         self._message_id = None
@@ -87,5 +88,3 @@ class Interface(SerializableMixin):
 
     async def _update_interface_in_redis(self, state):
         await state.update_data({'interface': await self.serialize()})
-
-

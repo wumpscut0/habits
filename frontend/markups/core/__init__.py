@@ -1,10 +1,7 @@
-import pickle
-from base64 import b64encode
 from typing import List, Dict, Any
 
 from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.state import State
-from aiogram.types import InputMediaPhoto
 from aiogram.utils.formatting import as_list, Text, Bold, Italic
 from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardButton
 
@@ -37,14 +34,14 @@ class Resettable:
             setattr(self.obj, name, value)
 
 
-class TextWidget(Resettable, Hideable):
+class TextWidget(Hideable, Resettable):
     def __init__(self, text: str = None, active=True):
         super(Hideable, self).__init__(active)
         self._text = text
-        self._default_text = self._text
+        super(Resettable, self).__init__(self)
 
     def __repr__(self):
-        return self._text
+        return self.text
 
     @property
     def text(self):
@@ -53,15 +50,15 @@ class TextWidget(Resettable, Hideable):
         return Bold(self._text)
 
     @text.setter
-    def text(self, text):
-        self._text = text
+    def text(self, value):
+        self._text = value
 
 
 class DataTextWidget(Hideable, Resettable):
     def __init__(
             self,
-            header: str,
             *,
+            header: str = None,
             data: str = Emoji.GREY_QUESTION,
             mark: str = '',
             sep: str = ': ',
@@ -81,6 +78,8 @@ class DataTextWidget(Hideable, Resettable):
 
     @property
     def text(self):
+        if self.header is None:
+            return Emoji.BAN
         separator = '' if str(self.header).startswith(' ') else ' '
         return Text(self.mark) + Text(separator) + Bold(self.header) + Text(self.sep) + Italic(self.data) + Italic(self.end)
 
@@ -88,9 +87,9 @@ class DataTextWidget(Hideable, Resettable):
 class ButtonWidget(Hideable, Resettable):
     def __init__(
             self,
-            text: str,
-            callback_data: str | CallbackData,
             *,
+            text: str = None,
+            callback_data: str | CallbackData = None,
             mark: str = '',
             active=True
     ):
@@ -102,36 +101,31 @@ class ButtonWidget(Hideable, Resettable):
 
     @property
     def button(self):
+        if not self.text or not self.callback_data:
+            return InlineKeyboardButton(text=Emoji.BAN, callback_data='None')
         separator = '' if self.text.startswith(' ') else ' '
         return InlineKeyboardButton(text=self.mark + separator + self.text, callback_data=self.callback_data)
 
 
-class SerializableMixin:
-    async def serialize(self):
-        return b64encode(pickle.dumps(self)).decode()
-
-
-class PhotoMarkup:
-    def __init__(self):
-        self._photo: str | InputMediaPhoto | None = None
-
-    @property
-    def photo(self):
-        return self._photo
-
-    @photo.setter
-    def photo(self, photo: str | InputMediaPhoto):
-        self._photo = photo
+# class PhotoMarkup:
+#     def __init__(self):
+#         self._photo: str | InputMediaPhoto | None = None
+#
+#     @property
+#     def photo(self):
+#         return self._photo
+#
+#     @photo.setter
+#     def photo(self, photo: str | InputMediaPhoto):
+#         self._photo = photo
 
 
 class TextMap:
-    def __init__(self, map_: Dict[str, DataTextWidget | TextWidget] = None):
+    def __init__(self, map_: Dict[str, DataTextWidget | TextWidget]):
         self._map = map_
 
     @property
     async def text(self):
-        if self._map is None:
-            return f'{Emoji.BAN}'
         return (as_list(*[row.text for row in self._map.values() if row.active])).as_html()
 
     def __getitem__(self, name):
@@ -144,8 +138,12 @@ class TextMap:
 
 class MarkupMap:
     def __init__(self, map_: List[Dict[str, ButtonWidget]] = None):
-        self._map = map_
-        self._adapt_map = {name: button for row in map_ for name, button in row.items()}
+        if map_ is None:
+            self._map = []
+            self._adapt_map = {}
+        else:
+            self._map = map_
+            self._adapt_map = {name: button for row in map_ for name, button in row.items()}
 
     @property
     async def markup(self):
@@ -156,8 +154,10 @@ class MarkupMap:
     def __getitem__(self, name):
         return self._adapt_map[name]
 
-    async def set_map(self, map_: List[Dict[str, ButtonWidget]]):
-        self._map = map_
+    async def add_buttons(self, map_: Dict[str, ButtonWidget]):
+        self._map.append(map_)
+        for name, button in map_.items():
+            self._adapt_map[name] = button
 
     async def reset(self):
         for button in self._adapt_map.values():
@@ -168,8 +168,7 @@ class TextMarkup:
     def __init__(
             self,
             interface: Interface,
-            *,
-            text_map: TextMap = TextMap(),
+            text_map: TextMap,
             markup_map: MarkupMap = MarkupMap(),
             state: State | None = None
     ):
@@ -178,7 +177,7 @@ class TextMarkup:
         self.markup_map = markup_map
         self.state = state
 
-    async def open(self, state):
+    async def open(self, state, **kwargs):
         await self._interface.update(state, self)
 
     @property

@@ -21,7 +21,7 @@ class AuthManager:
         self.resume_password = PasswordResume(interface)
         self.create_email = CreateEmail(interface)
         self.input_verify_email_code = InputVerifyEmailCode(interface)
-        self.sign_in_with_password = SignInWithPassword(interface)
+        self.authorization_with_password = AuthorizationWithPassword(interface)
 
     async def update_password(self, session: ClientSession, state: FSMContext):
         async with (session.patch('/update_password', json={
@@ -36,14 +36,6 @@ class AuthManager:
                 else:
                     feedback = f'{Emoji.OK} Password and email updated'
                 self._interface.feedback.data = feedback
-
-                self._interface.auth_manager.resume_password.markup_map[
-                    'accept_password'
-                ].callback_data = 'update_password'
-
-                self._interface.basic_manager.options.markup_map[
-                    'update_password'
-                ].text = f'{Emoji.KEY}{Emoji.UP} Update password'
 
                 self._interface.basic_manager.options.markup_map['delete_password'].on()
                 await self._interface.basic_manager.profile.open(state)
@@ -65,7 +57,7 @@ class CreatePassword(TextMarkup):
             markup_map=MarkupMap(
                 [
                     {
-                        "back": ButtonWidget(f"{Emoji.DENIAL} Cancel", callback_data='profile')
+                        "back": ButtonWidget(text=f"{Emoji.DENIAL} Cancel", callback_data='profile')
                     }
                 ]
             ),
@@ -93,7 +85,7 @@ class RepeatPassword(TextMarkup):
             markup_map=MarkupMap(
                 [
                     {
-                        "back": ButtonWidget(f"{Emoji.DENIAL} Cancel", callback_data='profile')
+                        "back": ButtonWidget(text=f"{Emoji.DENIAL} Cancel", callback_data='profile')
                     }
                 ]
             ),
@@ -128,24 +120,30 @@ class PasswordResume(TextMarkup):
             text_map=TextMap(
                 {
                     "info": TextWidget(f'{Emoji.DIAGRAM} Password grade'),
-                    "strength": DataTextWidget(f"{Emoji.SHIELD} Strength"),
-                    "warning": DataTextWidget(f"{Emoji.WARNING} Warning", active=False),
-                    "suggestions": DataTextWidget(f"{Emoji.SHINE_STAR} Suggestions", active=False),
+                    "strength": DataTextWidget(header=f"{Emoji.SHIELD} Strength"),
+                    "warning": DataTextWidget(header=f"{Emoji.WARNING} Warning", active=False),
+                    "suggestions": DataTextWidget(header=f"{Emoji.SHINE_STAR} Suggestions", active=False),
                 }
             ),
             markup_map=MarkupMap(
                 [
                     {
-                        "accept_password": ButtonWidget(f"{Emoji.OK + Emoji.KEY} Accept password", "create_email")
+                        "accept_password": ButtonWidget(
+                            text=f"{Emoji.OK + Emoji.KEY} Accept password",
+                            callback_data="create_email"
+                        )
                     },
                     {
-                        "back": ButtonWidget(f'{Emoji.DENIAL} Cancel', "update_password")
+                        "back": ButtonWidget(text=f'{Emoji.DENIAL} Cancel', callback_data="update_password")
                     }
                 ]
             ),
         )
 
     async def open(self, state):
+        if self._interface.basic_manager.options.markup_map['delete_password'].active:
+            self.markup_map['accept_password'].callback_data = 'update_password'
+
         password_grade = self._interface.storage['password_grade']
 
         self.text_map['strength'].data = self._strength_marks[password_grade['score']]
@@ -180,7 +178,7 @@ class CreateEmail(TextMarkup):
             markup_map=MarkupMap(
                 [
                     {
-                        "back": ButtonWidget(f'{Emoji.BACK} Back to profile', "profile")
+                        "back": ButtonWidget(text=f'{Emoji.BACK} Back to profile', callback_data="profile")
                     }
                 ]
             ),
@@ -218,7 +216,7 @@ class InputVerifyEmailCode(TextMarkup):
             markup_map=MarkupMap(
                 [
                     {
-                        "back": ButtonWidget(f'{Emoji.BACK} Change email', "input_email")
+                        "back": ButtonWidget(text=f'{Emoji.BACK} Change email', callback_data="input_email")
                     }
                 ]
             ),
@@ -237,7 +235,7 @@ class InputVerifyEmailCode(TextMarkup):
             await self._interface.auth_manager.update_password(session, state)
 
 
-class SignInWithPassword(TextMarkup):
+class AuthorizationWithPassword(TextMarkup):
     def __init__(self, interface: Interface):
         super().__init__(
             interface,
@@ -249,7 +247,10 @@ class SignInWithPassword(TextMarkup):
             markup_map=MarkupMap(
                 [
                     {
-                        "reset_password": ButtonWidget(f'{Emoji.CYCLE} Reset password', 'reset_password')
+                        "reset_password": ButtonWidget(
+                            text=f'{Emoji.CYCLE} Reset password',
+                            callback_data='reset_password'
+                        )
                     }
                 ]
             ),
@@ -257,8 +258,9 @@ class SignInWithPassword(TextMarkup):
         )
 
     async def __call__(self, state: FSMContext, session: ClientSession, password: str):
-        async with session.post('/sign_in',
-                                json={'telegram_id': self._interface.chat_id, "password": password}) as response:
+        async with session.post('/sign_in', json={
+            'telegram_id': self._interface.chat_id, "password": password
+        }) as response:
             if response.status == 200:
                 self._interface.token = (await response.json())['token']
                 await self._interface.basic_manager.profile.open(state)

@@ -7,7 +7,7 @@ import jwt
 from dotenv import load_dotenv, find_dotenv
 from configparser import ConfigParser
 from logging.config import dictConfig
-from base64 import b64decode
+from base64 import b64decode, b64encode
 from pytz import utc
 
 from aiogram import Bot
@@ -21,6 +21,11 @@ from frontend.controller import Interface
 from frontend.routers.abyss import abyss_router
 from frontend.middlewares import CommonMiddleware
 from frontend.routers.profile import profile_router
+
+
+class SerializableMixin:
+    async def serialize(self):
+        return b64encode(pickle.dumps(self)).decode()
 
 
 async def deserialize(sequence: str):

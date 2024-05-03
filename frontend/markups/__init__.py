@@ -13,6 +13,7 @@ MAX_DESCRIPTION_LENGTH = config.get('limitations', 'MAX_DESCRIPTION_LENGTH')
 MAX_PASSWORD_LENGTH = config.get('limitations', "MAX_PASSWORD_LENGTH")
 MIN_BORDER_RANGE = config.get('limitations', "MIN_BORDER_RANGE")
 MAX_BORDER_RANGE = config.get('limitations', "MAX_BORDER_RANGE")
+STANDARD_BORDER_RANGE = config.get('limitations', "STANDARD_BORDER_RANGE")
 
 MAIL_ADDRESS = os.getenv('ORGANIZATION_EMAIL')
 SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
@@ -57,13 +58,14 @@ class Emoji:
     SPROUT = "🌱"
     DIAGRAM = "📊"
     BULB = "💡"
-    GEAR = "⚙️"
+    GEAR️ = "⚙️"
     ENVELOPE = "✉️"
     LOCK_AND_KEY = "🔐"
     PLUS = "➕"
     UP = "🆙"
     SKIP = "⏭️"
     GREEN_BIG_SQUARE = "🟩"
+    GREY_BUG_SQUARE = "⬜️"
     RED_QUESTION = "❓"
     GREY_QUESTION = "❔"
     BAN = "🚫"
@@ -71,3 +73,5 @@ class Emoji:
     YELLOW_CIRCLE = "🟡"
     ORANGE_CIRCLE = "🟠"
     RED_CIRCLE = "🔴"
+    FLAG_FINISH = "🏁"
+
