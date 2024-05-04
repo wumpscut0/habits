@@ -9,6 +9,7 @@ from backend import config
 MAX_EMAIL_LENGTH = config.get('limitations', 'MAX_EMAIL_LENGTH')
 MAX_NAME_LENGTH = config.get('limitations', 'MAX_NAME_LENGTH')
 MAX_DESCRIPTION_LENGTH = config.get('limitations', 'MAX_DESCRIPTION_LENGTH')
+DEFAULT_REMAINING_HOUR = config.get('limitations', "DEFAULT_REMAINING_HOUR")
 
 
 class Base(DeclarativeBase):
@@ -21,7 +22,7 @@ class UserORM(Base):
     hash = Column(String, nullable=True)
     email = Column(VARCHAR(MAX_EMAIL_LENGTH), nullable=True, unique=True)
     notifications = Column(Boolean, default=True)
-    notification_time = Column(Time, default=time(20, 0, tzinfo=pytz.utc))
+    notification_time = Column(Time, default=time(DEFAULT_REMAINING_HOUR, 0, tzinfo=pytz.utc))
     target = Column(Integer, ForeignKey('target.id'))
 
     targets = relationship('HabitORM')

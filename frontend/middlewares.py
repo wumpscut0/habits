@@ -4,9 +4,10 @@ from typing import Callable, Dict, Any, Awaitable
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, Update
 from aiohttp import ClientSession
+from apscheduler.triggers.cron import CronTrigger
 
-from frontend import deserialize, scheduler
-from frontend.markups.interface import Interface
+from frontend import deserialize, scheduler, Interface, DEFAULT_REMAINING_HOUR
+
 from frontend.markups.remainder import remainder
 
 
@@ -29,10 +30,12 @@ class CommonMiddleware(BaseMiddleware):
         async with session_context as session:
             data['session'] = session
             if interface is None:
-                await session.post('/sign_up', json={'telegram_id': event.message.from_user.id})
+                user_id = event.message.from_user.first_name
 
-                current_data['interface'] = await Interface(event.message.chat.id, event.message.from_user.first_name).serialize()
-                scheduler.add_job(func=remainder, args=(event.message.chat.id,), replace_existing=True)
+                await session.post('/sign_up', json={'telegram_id': user_id})
+
+                current_data['interface'] = await Interface(event.message.chat.id, user_id).serialize()
+                scheduler.add_job(func=remainder, trigger=CronTrigger(hour=DEFAULT_REMAINING_HOUR), args=(event.message.chat.id,), replace_existing=True, id=user_id)
                 interface = await deserialize(current_data['interface'])
             else:
                 if event.message is not None:

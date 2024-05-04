@@ -46,3 +46,4 @@ info = logging.getLogger('info')
 config = ConfigParser()
 
 config.read('./config.ini')
+

@@ -1,10 +1,10 @@
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
-from frontend import bot
-from frontend.markups import STANDARD_BORDER_RANGE
+
+from frontend import bot, SerializableMixin, Emoji
 from frontend.markups.auth import AuthManager
 from frontend.markups.basic import BasicManager
-from frontend.markups.core import SerializableMixin, TextMarkup, TextMap, DataTextWidget
+from frontend.markups.core import TextMarkup, DataTextWidget
 from frontend.markups.targets import TargetsManager
 
 
@@ -17,7 +17,7 @@ class Interface(SerializableMixin):
         self.first_name = first_name
         self.chat_id = chat_id
         self.token = None
-        self.feedback = DataTextWidget(header='📝 Feedback', active=False)
+        self.feedback = DataTextWidget(header=f'{Emoji.REPORT} Feedback', active=False)
         self.storage = {}
 
         self._message_id = None

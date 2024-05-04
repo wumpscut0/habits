@@ -2,6 +2,7 @@ import re
 from aiogram.fsm.context import FSMContext
 from aiohttp import ClientSession
 
+from frontend import Emoji, scheduler
 from frontend.FSM import States
 from frontend.markups import MAX_NAME_LENGTH, MAX_DESCRIPTION_LENGTH, MIN_BORDER_RANGE, MAX_BORDER_RANGE, \
     STANDARD_BORDER_RANGE
@@ -89,7 +90,7 @@ class TargetsControl(TextMarkup):
             elif response.status == 401:
                 await self._interface.close_session(state)
             else:
-                await self._interface.markup.handling_unexpected_error(state)
+                await self._interface.handling_unexpected_error(state)
 
         self._interface.storage.update({"target_name": None, "target_border": STANDARD_BORDER_RANGE})
 
@@ -124,10 +125,10 @@ class ShowUpTargets(TextMarkup):
                 total_completed = 0
                 total_targets = len(targets_)
 
-                for target in enumerate(targets_):
+                for i, target in enumerate(targets_):
                     if target.completed:
                         total_completed += 1
-                        self.markup_map.add_buttons(
+                        await self.markup_map.add_buttons(
                             {
                                 target.id: ButtonWidget(
                                     text=target.name,
@@ -137,7 +138,7 @@ class ShowUpTargets(TextMarkup):
                             }
                         )
                     else:
-                        self.markup_map.add_buttons(
+                        await self.markup_map.add_buttons(
                             {
                                 target.id: ButtonWidget(
                                     text=target.name,
@@ -156,31 +157,33 @@ class ShowUpTargets(TextMarkup):
                 await self._interface.handling_unexpected_error(state)
 
 
-
-
 class Target(TextMarkup):
     def __init__(self, interface: Interface):
         super().__init__(
             interface,
             TextMap(
                 {
-                    "name": DataTextWidget(header='Name'),
-                    "description": DataTextWidget(header='Description'),
-                    "percent_progress": DataTextWidget(header='Progress'),
+                    "name": DataTextWidget(header=f'{Emoji.DART} Name'),
+                    "description": DataTextWidget(header=f'{Emoji.LIST_WITH_PENCIL} Description'),
+                    "percent_progress": DataTextWidget(header=f'{Emoji.TROPHY} Progress'),
                     "completed": DataTextWidget(header='Completed'),
                 }
             ),
             MarkupMap(
                 [
                     {
-                        "update_name": ButtonWidget(text='Update name'),
-                        "update_description": ButtonWidget(text='Update description'),
-                        "delete_target": ButtonWidget(text='Delete'),
+                        "update_name": ButtonWidget(text=f'{Emoji.NEW} Update name'),
+                        "update_description": ButtonWidget(text=f'{Emoji.NEW} Update description'),
+                        "delete_target": ButtonWidget(text=f'{Emoji.DENIAL} Delete'),
                         "completed": ButtonWidget()
+                    },
+                    {
+                        "back": ButtonWidget(text=f"{Emoji.BACK}", callback_data="targets")
                     }
                 ]
             )
         )
+
     async def open(self, state, **kwargs):
         target = self._interface.storage["targets"][kwargs["target_id"]]
 
@@ -210,7 +213,13 @@ class Target(TextMarkup):
             if response.status == 200:
                 response = await response.text()
                 self.markup_map['completed'].text = f'{Emoji.DENIAL} Incomplete' if response == '1' else f'{Emoji.OK} Complete'
+                self._interface.storage["targets"][target_id]["completed"] = True if response == '1' else False
+
                 await self.open(state, target_id=target_id)
+
+                async with session.get("is_all_done") as response_:
+                    if response_ == "1":
+                        scheduler.remove_job(job_id=self._interface.chat_id)
             elif response.status == 401:
                 await self._interface.close_session(state)
             else:

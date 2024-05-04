@@ -1,7 +1,10 @@
 from aiogram.fsm.context import FSMContext
 from aiohttp import ClientSession
+from apscheduler.triggers.cron import CronTrigger
 
+from frontend import Emoji, scheduler
 from frontend.markups.core import *
+
 
 class BasicManager:
     def __init__(self, interface: Interface):
@@ -36,7 +39,7 @@ class Profile(TextMarkup):
             )
         )
 
-    async def open(self, state):
+    async def open(self, state, **kwargs):
         self.text_map['hello'].data = self._interface.first_name
         await super().open(state)
 
@@ -47,14 +50,13 @@ class Options(TextMarkup):
             interface,
             TextMap(
                 {
-                    "action": TextWidget(f'{Emoji.GEAR️} Choose option')
+                    "notification_time": DataTextWidget(header=f"{Emoji.BELL + Emoji.CLOCK} Notification time")
                 }
             ),
             MarkupMap(
                 [
                     {
                         "update_password": ButtonWidget(
-                            text=f"{Emoji.KEY}{Emoji.PLUS} Add password",
                             callback_data="update_password"
                         ),
                         "delete_password": ButtonWidget(
@@ -63,13 +65,93 @@ class Options(TextMarkup):
                             active=False
                         ),
                     },
+                    {
+                        "notifications": ButtonWidget(
+                            text=f"{Emoji.BELL + Emoji.CLOCK} Change notification time",
+                            callback_data="change_notification"
+                        )
+                    }
                 ]
             )
         )
 
-    async def open(self, state):
-        self.markup_map['update_password'].text = f'{Emoji.KEY}{Emoji.UP} Update password'
+    async def open(self, state, **kwargs):
+        async with kwargs['session'].get(f'/notification_time') as response:
+            time_ = await response.json()
+            self.text_map["notification_time"].data = f"{time_['hour']}:{time_['minute']}"
+
+        if self.markup_map["delete_password"].active:
+            self.markup_map['update_password'].text = f'{Emoji.KEY}{Emoji.UP} Update password'
+        else:
+            self.markup_map["update_password"].text = f"{Emoji.KEY}{Emoji.PLUS} Add password"
+
         await super().open(state)
+
+    async def update_notifications_time(self, session: ClientSession, state: FSMContext):
+        hour = self._interface.storage["hour"]
+        minute = self._interface.storage["minute"]
+
+        async with session.patch('/notification_time', json={"hour": hour, "minute": minute}) as response:
+            if response.status == 200:
+                self.text_map["notification_time"].data = f"{hour}:{minute}"
+                scheduler.modify_job(self._interface.chat_id, trigger=CronTrigger(hour=hour, minute=minute))
+                await self.open(state)
+            elif response.status == 401:
+                await self._interface.close_session(state)
+            else:
+                await self._interface.handling_unexpected_error(state)
+
+
+class NotificationHourCallbackData(CallbackData):
+    hour: int
+
+
+class ChangeNotificationsHour(TextMarkup):
+    def __init__(self, interface: Interface):
+        super().__init__(
+            interface,
+            TextMap(
+                {
+                    "info": TextWidget(f"{Emoji.CLOCK} Choose notification hour")
+                }
+            ),
+            MarkupMap(
+                [
+                    {
+                        str(hour): ButtonWidget(
+                            callback_data=NotificationHourCallbackData(hour=hour)
+                        ) for hour in range(start, start + 8)
+                    }
+                    for start in range(0, 24, 8)
+                ]
+            )
+        )
+
+
+class NotificationMinuteCallbackData(CallbackData):
+    minute: int
+
+
+class ChangeNotificationsMinute(TextMarkup):
+    def __init__(self, interface: Interface):
+        super().__init__(
+            interface,
+            TextMap(
+                {
+                    "info": TextWidget(f"{Emoji.CLOCK} Choose notification minute")
+                }
+            ),
+            MarkupMap(
+                [
+                    {
+                        str(hour): ButtonWidget(
+                            callback_data=NotificationMinuteCallbackData(hour=hour)
+                        ) for hour in range(start, start + 10)
+                    }
+                    for start in range(0, 60, 10)
+                ]
+            )
+        )
 
 
 class TitleScreen(TextMarkup):

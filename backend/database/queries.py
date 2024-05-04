@@ -46,6 +46,18 @@ class AuthQueries:
 
 class CommonQueries:
     @staticmethod
+    async def users_ids(session: AsyncSession):
+        return (await session.execute(select(UserORM.telegram_id).where(UserORM.notifications))).scalars()
+
+    @staticmethod
+    async def user_notification_time(session: AsyncSession, telegram_id: int):
+        return (await session.execute(select(UserORM.notification_time).where(UserORM.telegram_id == telegram_id))).scalar()
+
+    @staticmethod
+    async def change_notification_time(session: AsyncSession, telegram_id: int):
+        await session.execute(update(UserORM.notification_time).values({"notification_time": time()}).where(UserORM.telegram_id == telegram_id))
+
+    @staticmethod
     async def user(session: AsyncSession, telegram_id: int):
         user = await session.get(UserORM, ident=telegram_id)
         if user is None:
@@ -79,7 +91,7 @@ class CommonQueries:
         return "1" if not notifications else '0'
 
 
-class HabitsQueries:
+class TargetsQueries:
     @staticmethod
     async def create(
         session: AsyncSession,
@@ -102,7 +114,7 @@ class HabitsQueries:
         await session.execute(delete(TargetORM).where(TargetORM.id == habit_id))
 
     @staticmethod
-    async def get_user_habits(session: AsyncSession, telegram_id: int):
+    async def get_user_targets(session: AsyncSession, telegram_id: int):
         return [
             habit.as_dict_() for habit in (await session.execute(
                 select(TargetORM)
@@ -145,6 +157,13 @@ class HabitsQueries:
         return '1' if habit.completed else '0'
 
     @staticmethod
+    async def is_all_done(session: AsyncSession, telegram_id: int):
+        return '1' if all((await session.execute(select(TargetORM.completed).where(UserORM.telegram_id == telegram_id)))
+                          .scalars()) else '0'
+
+    @staticmethod
     async def increase_progress(session: AsyncSession):
-        await session.execute(update(TargetORM).filter(TargetORM.progress + 1 <= TargetORM.border_progress))
+        await session.execute(update(TargetORM).values({"completed": False, "progress": TargetORM.progress + 1}).filter(
+            TargetORM.progress + 1 <= TargetORM.border_progress, TargetORM.completed
+        ))
         await session.commit()

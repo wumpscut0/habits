@@ -1,8 +1,7 @@
 from aiogram.utils.formatting import Bold
 from aiogram.types.inline_keyboard_markup import InlineKeyboardMarkup, InlineKeyboardButton
 
-from frontend import bot
-from frontend.markups import Emoji
+from frontend import bot, Emoji, scheduler
 
 remainder_text = Bold('Don`t forget mark done target today')
 remainder_markup = InlineKeyboardMarkup(
@@ -13,6 +12,6 @@ remainder_markup = InlineKeyboardMarkup(
         ]
     )
 
+
 async def remainder(chat_id: int):
-    # OFF THIS JOB IF USER DONE ALL
-    bot.send_message(chat_id=chat_id, text="", reply_markup=remainder_markup)
+    bot.send_message(chat_id=chat_id, text=remainder_text, reply_markup=remainder_markup)

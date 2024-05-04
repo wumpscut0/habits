@@ -1,13 +1,15 @@
+
 from typing import Annotated
 
 from fastapi import Header, Request
+
 
 from backend import errors
 from backend.database.queries import *
 from backend.database import Session
 from backend.routers import Mailing, app
 from backend.routers.models import AuthApiModel, TelegramIdApiModel, UpdatePasswordApiModel, HabitApiModel
-from backend.database.queries import AuthQueries, HabitsQueries, CommonQueries, decode_jwt
+from backend.database.queries import AuthQueries, TargetsQueries, CommonQueries, decode_jwt
 
 
 @app.post("/sign_up")
@@ -44,17 +46,37 @@ async def reset_password(Authorization: Annotated[str, Header()]):
         return email
 
 
-@app.patch("/invert_notification")
-async def invert_notification(telegram_id_api_model: TelegramIdApiModel):
+@app.patch("/invert_notification/{key}/{user_id}")
+async def invert_notification(key: str, user_id: int):
+    if os.getenv('SERVICES_PASSWORD') != (await decode_jwt(key))['password']:
+        raise HTTPException(401)
     async with Session.begin() as session:
-        return await CommonQueries.invert_user_notifications(session, **telegram_id_api_model.model_dump())
+        return await CommonQueries.invert_user_notifications(session, user_id)
 
 
-@app.get('/show_up_habits')
+@app.get("/notification_time")
+async def get_notification_time(Authorization: Annotated[str, Header()]):
+    async with Session.begin() as session:
+        telegram_id = await AuthQueries.authentication(session, Authorization)
+        time = await CommonQueries.user_notification_time(session, telegram_id)
+        return {
+            "hour": time.hour,
+            "minute": time.minute
+        }
+
+
+@app.patch("notification_time")
+async def change_notification_time(Authorization: Annotated[str: Header()]):
+    async with Session.begin() as session:
+        telegram_id = await AuthQueries.authentication(session, Authorization)
+
+
+
+@app.get('/show_up_targets')
 async def show_up(Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
         telegram_id = await AuthQueries.authentication(session, Authorization)
-        return await HabitsQueries.get_user_habits(session, telegram_id)
+        return await TargetsQueries.get_user_targets(session, telegram_id)
 
 
 @app.get("/has_a_mail")
@@ -67,46 +89,61 @@ async def has_a_mail(Authorization: Annotated[str, Header()]):
 
 
 @app.post('/create_target')
-async def create_habit(habit_api_model: HabitApiModel, Authorization: Annotated[str, Header()]):
+async def create_target(target_api_model: HabitApiModel, Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
         telegram_id = await AuthQueries.authentication(session, Authorization)
-        await HabitsQueries.create(session, telegram_id, **habit_api_model.model_dump())
+        await TargetsQueries.create(session, telegram_id, **target_api_model.model_dump())
 
 
-@app.patch('/update_habit_name/{habit_id}')
-async def update_habit_name(habit_id: int, name: str, Authorization: Annotated[str, Header()]):
+@app.patch('/update_target_name/{target_id}')
+async def update_target_name(target_id: int, name: str, Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
         telegram_id = await AuthQueries.authentication(session, Authorization)
-        await HabitsQueries.update_name(session, telegram_id, habit_id, name)
+        await TargetsQueries.update_name(session, telegram_id, target_id, name)
 
 
-@app.patch('/update_habit_description/{habit_id}')
-async def update_habit_description(habit_id: int, description: str, Authorization: Annotated[str, Header()]):
+@app.patch('/update_target_description/{target_id}')
+async def update_target_description(target_id: int, description: str, Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
         telegram_id = await AuthQueries.authentication(session, Authorization)
-        await HabitsQueries.update_description(session, telegram_id, habit_id, description)
+        await TargetsQueries.update_description(session, telegram_id, target_id, description)
 
 
-@app.delete('/delete_habit/{habit_id}')
-async def delete_habit(habit_id: int, Authorization: Annotated[str, Header()]):
+@app.delete('/delete_target/{target_id}')
+async def delete_target(target_id: int, Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
         await AuthQueries.authentication(session, Authorization)
-        await HabitsQueries.delete(session, habit_id)
+        await TargetsQueries.delete(session, target_id)
 
 
-@app.patch('/invert_habit_completed/{habit_id}')
-async def invert_habit_completed(habit_id: int, Authorization: Annotated[str, Header()]):
+@app.patch('/invert_target_completed/{target_id}')
+async def invert_target_completed(target_id: int, Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
         telegram_id = await AuthQueries.authentication(session, Authorization)
-        return await HabitsQueries.invert_completed(session, telegram_id, habit_id)
+        return await TargetsQueries.invert_completed(session, telegram_id, target_id)
+    
+
+@app.get('/is_all_done')
+async def is_all_done(Authorization: Annotated[str, Header()]):
+    async with Session.begin() as session:
+        telegram_id = await AuthQueries.authentication(session, Authorization)
+        return await TargetsQueries.is_all_done(session, telegram_id)
 
 
-@app.patch('/increase_habits_progress/{key}')
-async def increase_habits_progress(key: str):
+@app.patch('/increase_targets_progress/{key}')
+async def increase_targets_progress(key: str):
     if os.getenv('SERVICES_PASSWORD') != (await decode_jwt(key))['password']:
         raise HTTPException(401)
     async with Session.begin() as session:
-        await HabitsQueries.increase_progress(session)
+        await TargetsQueries.increase_progress(session)
+
+
+@app.get('/users_ids/{key}')
+async def increase_targets_progress(key: str):
+    if os.getenv('SERVICES_PASSWORD') != (await decode_jwt(key))['password']:
+        raise HTTPException(401)
+    async with Session.begin() as session:
+        return await CommonQueries.users_ids(session)
 
 
 @app.middleware('http')

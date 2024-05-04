@@ -18,9 +18,53 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.redis import RedisJobStore
 
 from frontend.controller import Interface
+from frontend.markups.remainder import remainder
 from frontend.routers.abyss import abyss_router
 from frontend.middlewares import CommonMiddleware
 from frontend.routers.profile import profile_router
+
+
+
+class Emoji:
+    OK = "✅"
+    DENIAL = "❌"
+    BACK = "⬇️"
+    KEY = "🔑"
+    DOOR = "🚪"
+    BRAIN = "🧠"
+    MEGAPHONE = "📢"
+    SHINE_STAR = "🌟"
+    WARNING = "⚠️"
+    SHIELD = "🛡"
+    CYCLE = "🔄"
+    BELL = "🔔"
+    NOT_BELL = "🔕"
+    EYE = "👁"
+    SPROUT = "🌱"
+    DIAGRAM = "📊"
+    BULB = "💡"
+    GEAR️ = "⚙️"
+    ENVELOPE = "✉️"
+    LOCK_AND_KEY = "🔐"
+    PLUS = "➕"
+    UP = "🆙"
+    SKIP = "⏭️"
+    GREEN_BIG_SQUARE = "🟩"
+    GREY_BUG_SQUARE = "⬜️"
+    RED_QUESTION = "❓"
+    GREY_QUESTION = "❔"
+    BAN = "🚫"
+    GREEN_CIRCLE = "🟢"
+    YELLOW_CIRCLE = "🟡"
+    ORANGE_CIRCLE = "🟠"
+    RED_CIRCLE = "🔴"
+    FLAG_FINISH = "🏁"
+    DART = "🎯"
+    REPORT = "🧾"
+    LIST_WITH_PENCIL = "📝"
+    NEW = "🆕"
+    TROPHY = "🏆"
+    CLOCK = "🕒"
 
 
 class SerializableMixin:
@@ -36,6 +80,9 @@ async def increase_progress():
     signature = jwt.encode({"password": os.getenv('SERVICES_PASSWORD')}, os.getenv('JWT'))
     async with aiohttp.ClientSession() as session:
         await session.patch(os.getenv('BACKEND') + f'/increase_habits_progress/{signature}')
+        async with session.get(os.getenv('BACKEND') + f'/users_ids/{signature}') as response:
+            for user_id in (await response.json()):
+                scheduler.add_job(remainder,  replace_existing=True, id=user_id)
 
 
 async def reset_verify_code(interface):
@@ -98,6 +145,8 @@ config = ConfigParser()
 
 config.read('./config.ini')
 
+DEFAULT_REMAINING_HOUR = config.get('limitations', "DEFAULT_REMAINING_HOUR")
+
 jobstores = {
     'default': RedisJobStore(host='localhost', port=6380, db=1)
 }
@@ -111,4 +160,4 @@ job_defaults = {
 
 scheduler = AsyncIOScheduler()
 scheduler.configure(jobstores=jobstores, executors=executors, job_defaults=job_defaults, timezone=utc)
-scheduler.add_job(increase_progress, 'cron', hour=0)
+scheduler.add_job(increase_progress, 'cron', hour=0, replace_existing=True, id="increase_progress")
