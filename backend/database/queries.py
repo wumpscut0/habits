@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException
 from passlib.handlers.pbkdf2 import pbkdf2_sha256
+from sqlalchemy.orm import selectinload
 
 from backend.database import verify_password, decode_jwt
 from backend.database.models import UserORM, TargetORM
@@ -88,7 +89,7 @@ class CommonQueries:
             await session.execute(
                 update(UserORM).where(UserORM.telegram_id == telegram_id).values({"notifications": not notifications})
             )
-        return "1" if not notifications else '0'
+        return "1" if notifications else "0"
 
 
 class TargetsQueries:
@@ -159,11 +160,15 @@ class TargetsQueries:
     @staticmethod
     async def is_all_done(session: AsyncSession, telegram_id: int):
         return '1' if all((await session.execute(select(TargetORM.completed).where(UserORM.telegram_id == telegram_id)))
-                          .scalars()) else '0'
+                          .scalars()) else (await session.execute(select(UserORM.notification_time).where(UserORM.telegram_id == telegram_id))).scalar()
 
     @staticmethod
     async def increase_progress(session: AsyncSession):
-        await session.execute(update(TargetORM).values({"completed": False, "progress": TargetORM.progress + 1}).filter(
+        await session.execute(update(TargetORM).values({"progress": TargetORM.progress + 1}).filter(
             TargetORM.progress + 1 <= TargetORM.border_progress, TargetORM.completed
         ))
+        await session.execute(update(TargetORM).values({"completed": False}).filter(
+            TargetORM.progress != TargetORM.border_progress
+        ))
+
         await session.commit()

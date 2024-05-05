@@ -64,12 +64,18 @@ async def get_notification_time(Authorization: Annotated[str, Header()]):
             "minute": time.minute
         }
 
+@app.get("notification_is_on")
+async def notification_is_on(Authorization: Annotated[str, Header()]):
+    async with Session.begin() as session:
+        telegram_id = await AuthQueries.authentication(session, Authorization)
+        CommonQueries.n
 
-@app.patch("notification_time")
+
+@app.patch("/notification_time")
 async def change_notification_time(Authorization: Annotated[str: Header()]):
     async with Session.begin() as session:
         telegram_id = await AuthQueries.authentication(session, Authorization)
-
+        # return await CommonQueries.user_notification_time(telegram_id)
 
 
 @app.get('/show_up_targets')
@@ -127,7 +133,14 @@ async def invert_target_completed(target_id: int, Authorization: Annotated[str, 
 async def is_all_done(Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
         telegram_id = await AuthQueries.authentication(session, Authorization)
-        return await TargetsQueries.is_all_done(session, telegram_id)
+        result = await TargetsQueries.is_all_done(session, telegram_id)
+        if result == "1":
+            return result
+        else:
+            return {
+                "hour": result.hour,
+                "minute": result.minute
+            }
 
 
 @app.patch('/increase_targets_progress/{key}')

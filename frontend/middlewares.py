@@ -35,7 +35,6 @@ class CommonMiddleware(BaseMiddleware):
                 await session.post('/sign_up', json={'telegram_id': user_id})
 
                 current_data['interface'] = await Interface(event.message.chat.id, user_id).serialize()
-                scheduler.add_job(func=remainder, trigger=CronTrigger(hour=DEFAULT_REMAINING_HOUR), args=(event.message.chat.id,), replace_existing=True, id=user_id)
                 interface = await deserialize(current_data['interface'])
             else:
                 if event.message is not None:

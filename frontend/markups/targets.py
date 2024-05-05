@@ -1,8 +1,9 @@
 import re
 from aiogram.fsm.context import FSMContext
 from aiohttp import ClientSession
+from apscheduler.triggers.cron import CronTrigger
 
-from frontend import Emoji, scheduler
+from frontend import Emoji, scheduler, remainder
 from frontend.FSM import States
 from frontend.markups import MAX_NAME_LENGTH, MAX_DESCRIPTION_LENGTH, MIN_BORDER_RANGE, MAX_BORDER_RANGE, \
     STANDARD_BORDER_RANGE
@@ -86,7 +87,11 @@ class TargetsControl(TextMarkup):
         }) as response:
             if response.status == 200:
                 self._interface.feedback.data = f'{Emoji.SPROUT} Target with name {name} created'
+                async with session.get('/notification_time') as response_:
+                    time = (await response_.json())
+                    hour, minute = time["hour"], time['minute']
                 await self._interface.targets_manager.targets_control.open(state)
+                scheduler.add_job(func=remainder, trigger=CronTrigger(hour=hour, minute=minute), args=(self._interface.chat_id,), replace_existing=True, id=self._interface.chat_id)
             elif response.status == 401:
                 await self._interface.close_session(state)
             else:
@@ -245,6 +250,7 @@ class UpdateTargetName(TextMarkup):
             States.update_target_name
 
         )
+
     async def open(self, state, **kwargs):
         self.markup_map["back"].callback_data = ShowTargetCallbackData(id=kwargs["target_id"])
         await super().open(state)
@@ -327,6 +333,7 @@ class ConformDeleteTarget(TextMarkup):
             ),
             States.update_target_description
         )
+
     async def open(self, state, **kwargs):
         self.markup_map["conform"].callback_data = ConformDeleteTargetCallbackData(id=kwargs["target_id"])
         self.markup_map["back"].callback_data = ShowTargetCallbackData(id=kwargs["target_id"])
@@ -351,9 +358,11 @@ class CreateTargetName(TextMarkup):
             ),
             States.create_target_name
         )
+
     async def open(self, state, **kwargs):
         self.markup_map["back"].callback_data = ShowTargetCallbackData(id=kwargs["target_id"])
         await super().open(state)
+
     async def __call__(self, session: ClientSession, name: str, state: FSMContext, target_id: int):
         self._interface.storage["border"] = STANDARD_BORDER_RANGE
 
@@ -386,6 +395,7 @@ class CreateTargetBorder(TextMarkup):
             ),
             States.create_target_border
         )
+
     async def open(self, state, **kwargs):
         self.markup_map["skip"].callback_data = CreateTargetCallbackData(id=kwargs["target_id"])
         await super().open(state)

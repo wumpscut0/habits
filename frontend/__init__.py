@@ -24,7 +24,6 @@ from frontend.middlewares import CommonMiddleware
 from frontend.routers.profile import profile_router
 
 
-
 class Emoji:
     OK = "✅"
     DENIAL = "❌"
@@ -43,7 +42,7 @@ class Emoji:
     SPROUT = "🌱"
     DIAGRAM = "📊"
     BULB = "💡"
-    GEAR️ = "⚙️"
+    GEAR = "⚙"
     ENVELOPE = "✉️"
     LOCK_AND_KEY = "🔐"
     PLUS = "➕"
@@ -79,7 +78,7 @@ async def deserialize(sequence: str):
 async def increase_progress():
     signature = jwt.encode({"password": os.getenv('SERVICES_PASSWORD')}, os.getenv('JWT'))
     async with aiohttp.ClientSession() as session:
-        await session.patch(os.getenv('BACKEND') + f'/increase_habits_progress/{signature}')
+        await session.patch(os.getenv('BACKEND') + f'/increase_targets_progress/{signature}')
         async with session.get(os.getenv('BACKEND') + f'/users_ids/{signature}') as response:
             for user_id in (await response.json()):
                 scheduler.add_job(remainder,  replace_existing=True, id=user_id)
