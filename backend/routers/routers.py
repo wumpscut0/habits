@@ -1,6 +1,6 @@
 
 from typing import Annotated
-
+from datetime import time
 from fastapi import Header, Request
 
 
@@ -8,7 +8,7 @@ from backend import errors
 from backend.database.queries import *
 from backend.database import Session
 from backend.routers import Mailing, app
-from backend.routers.models import AuthApiModel, TelegramIdApiModel, UpdatePasswordApiModel, HabitApiModel
+from backend.routers.models import AuthApiModel, TelegramIdApiModel, UpdatePasswordApiModel, TargetApiModel, NotificationTimeApiModel
 from backend.database.queries import AuthQueries, TargetsQueries, CommonQueries, decode_jwt
 
 
@@ -46,6 +46,13 @@ async def reset_password(Authorization: Annotated[str, Header()]):
         return email
 
 
+@app.delete("delete_password")
+async def delete_password(Authorization: Annotated[str, Header()]):
+    async with Session.begin() as session:
+        telegram_id = await AuthQueries.authentication(session, Authorization)
+        await CommonQueries.delete_password(session, telegram_id)
+
+
 @app.patch("/invert_notification/{key}/{user_id}")
 async def invert_notification(key: str, user_id: int):
     if os.getenv('SERVICES_PASSWORD') != (await decode_jwt(key))['password']:
@@ -64,18 +71,21 @@ async def get_notification_time(Authorization: Annotated[str, Header()]):
             "minute": time.minute
         }
 
+
 @app.get("notification_is_on")
 async def notification_is_on(Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
         telegram_id = await AuthQueries.authentication(session, Authorization)
-        CommonQueries.n
+        if CommonQueries.notification_time_is_on(session, telegram_id):
+            return '1'
+        raise "0"
 
 
 @app.patch("/notification_time")
-async def change_notification_time(Authorization: Annotated[str: Header()]):
+async def change_notification_time(time_: NotificationTimeApiModel, Authorization: Annotated[str: Header()]):
     async with Session.begin() as session:
         telegram_id = await AuthQueries.authentication(session, Authorization)
-        # return await CommonQueries.user_notification_time(telegram_id)
+        return await CommonQueries.change_notification_time(session, telegram_id, time(**time_.model_dump()))
 
 
 @app.get('/show_up_targets')
@@ -83,6 +93,13 @@ async def show_up(Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
         telegram_id = await AuthQueries.authentication(session, Authorization)
         return await TargetsQueries.get_user_targets(session, telegram_id)
+
+
+@app.get("/target/{target_id}")
+async def get_target(target_id: int, Authorization: Annotated[str, Header()]):
+    async with Session.begin() as session:
+        await AuthQueries.authentication(session, Authorization)
+        return TargetsQueries.get_target(session, target_id)
 
 
 @app.get("/has_a_mail")
@@ -95,7 +112,7 @@ async def has_a_mail(Authorization: Annotated[str, Header()]):
 
 
 @app.post('/create_target')
-async def create_target(target_api_model: HabitApiModel, Authorization: Annotated[str, Header()]):
+async def create_target(target_api_model: TargetApiModel, Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
         telegram_id = await AuthQueries.authentication(session, Authorization)
         await TargetsQueries.create(session, telegram_id, **target_api_model.model_dump())

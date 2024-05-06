@@ -22,7 +22,7 @@ class AuthApiModel(BaseModel):
 
     @field_validator('password', mode='before')
     @classmethod
-    def border_progress(cls, password):
+    def password_validate(cls, password):
         if len(password) > MAX_PASSWORD_LENGTH:
             raise HTTPException(
                 400,
@@ -37,7 +37,7 @@ class UpdatePasswordApiModel(BaseModel):
 
     @field_validator('email', mode='before')
     @classmethod
-    def border_progress(cls, email):
+    def email_validate(cls, email):
         if len(email) > MAX_EMAIL_LENGTH:
             raise HTTPException(
                 400,
@@ -46,14 +46,14 @@ class UpdatePasswordApiModel(BaseModel):
         return email
 
 
-class HabitApiModel(BaseModel):
+class TargetApiModel(BaseModel):
     name: str
     description: str | None = None
     border_progress: int | None = None
 
     @field_validator('border_progress', mode='before')
     @classmethod
-    def border_progress(cls, border):
+    def border_progress_validate(cls, border):
         if not MIN_BORDER_RANGE <= border <= MAX_BORDER_RANGE:
             raise HTTPException(
                 400,
@@ -63,12 +63,38 @@ class HabitApiModel(BaseModel):
 
     @field_validator('description', mode='before')
     @classmethod
-    def border_progress(cls, description):
+    def description_validate(cls, description):
         if len(description) > MAX_DESCRIPTION_LENGTH:
             raise HTTPException(
                 400,
                 detail=f'Max description length is {MAX_DESCRIPTION_LENGTH} symbols'
             )
         return description
+
+
+class NotificationTimeApiModel(BaseModel):
+    hour: int
+    minute: int
+
+    @field_validator('hour', mode="before")
+    @classmethod
+    def hour_validate(cls, hour):
+        if not 0 <= hour <= 23:
+            raise HTTPException(
+                400,
+                detail=f'Hour must be integer at 0 to 23'
+            )
+        return hour
+
+    @field_validator('minute', mode="before")
+    @classmethod
+    def minute_validate(cls, minute):
+        if not 0 <= minute <= 59:
+            raise HTTPException(
+                400,
+                detail=f'Minute must be integer at 0 to 59'
+            )
+        return minute
+
 
 

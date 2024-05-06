@@ -2,8 +2,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 
 from frontend import bot, SerializableMixin, Emoji
-from frontend.markups.auth import AuthManager
-from frontend.markups.basic import BasicManager
+from frontend.markups.basic import BasicManager, TitleScreen
 from frontend.markups.core import TextMarkup, DataTextWidget
 from frontend.markups.targets import TargetsManager
 
@@ -11,7 +10,6 @@ from frontend.markups.targets import TargetsManager
 class Interface(SerializableMixin):
     def __init__(self, chat_id: int, first_name: str):
         self.basic_manager = BasicManager(self)
-        self.auth_manager = AuthManager(self)
         self.targets_manager = TargetsManager(self)
 
         self.first_name = first_name

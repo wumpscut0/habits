@@ -42,7 +42,7 @@ class Emoji:
     SPROUT = "🌱"
     DIAGRAM = "📊"
     BULB = "💡"
-    GEAR = "⚙"
+    GEAR️ = "⚙"
     ENVELOPE = "✉️"
     LOCK_AND_KEY = "🔐"
     PLUS = "➕"
