@@ -5,8 +5,7 @@ from aiogram.fsm.state import State
 from aiogram.utils.formatting import as_list, Text, Bold, Italic
 from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardButton
 
-from frontend.controller import Interface
-from frontend.markups import Emoji
+from frontend.utils import Emoji
 
 
 class Hideable:
@@ -167,7 +166,7 @@ class MarkupMap:
 class TextMarkup:
     def __init__(
             self,
-            interface: Interface,
+            interface,
             text_map: TextMap,
             markup_map: MarkupMap = MarkupMap(),
             state: State | None = None

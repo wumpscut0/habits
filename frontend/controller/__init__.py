@@ -1,10 +1,11 @@
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 
-from frontend import bot, SerializableMixin, Emoji
-from frontend.markups.basic import BasicManager, TitleScreen
+from frontend.bot import bot
+from frontend.markups.basic import BasicManager
 from frontend.markups.core import TextMarkup, DataTextWidget
 from frontend.markups.targets import TargetsManager
+from frontend.utils import SerializableMixin, Emoji
 
 
 class Interface(SerializableMixin):

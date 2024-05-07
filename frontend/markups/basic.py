@@ -1,20 +1,31 @@
 import re
 from datetime import datetime, timedelta
 
+from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
 from aiohttp import ClientSession
 from apscheduler.triggers.cron import CronTrigger
 from passlib.handlers.pbkdf2 import pbkdf2_sha256
 from zxcvbn import zxcvbn
 
-from frontend import Emoji, scheduler, reset_verify_code
-from frontend.FSM import States
-from frontend.markups import Mailing, MAX_EMAIL_LENGTH, MAX_PASSWORD_LENGTH
-from frontend.markups.core import *
+from frontend.bot.FSM import States
+from frontend.markups.core import TextMarkup, TextMap, TextWidget, MarkupMap, ButtonWidget, DataTextWidget
+
+from frontend.utils import Emoji, config
+from frontend.utils.mailing import Mailing
+from frontend.utils.scheduler import scheduler, reset_verify_code
+
+MAX_EMAIL_LENGTH = config.getint('limitations', 'MAX_EMAIL_LENGTH')
+MAX_NAME_LENGTH = config.getint('limitations', 'MAX_NAME_LENGTH')
+MAX_DESCRIPTION_LENGTH = config.getint('limitations', 'MAX_DESCRIPTION_LENGTH')
+MAX_PASSWORD_LENGTH = config.getint('limitations', "MAX_PASSWORD_LENGTH")
+MIN_BORDER_RANGE = config.getint('limitations', "MIN_BORDER_RANGE")
+MAX_BORDER_RANGE = config.getint('limitations', "MAX_BORDER_RANGE")
+STANDARD_BORDER_RANGE = config.getint('limitations', "STANDARD_BORDER_RANGE")
 
 
 class BasicManager:
-    def __init__(self, interface: Interface):
+    def __init__(self, interface):
         self._interface = interface
         self.title_screen = TitleScreen(interface)
         self.authorization_with_password = AuthorizationWithPassword(interface)
@@ -31,7 +42,7 @@ class BasicManager:
 
 
 class TitleScreen(TextMarkup):
-    def __init__(self, interface: Interface):
+    def __init__(self, interface):
         super().__init__(
             interface,
             TextMap(
@@ -79,7 +90,7 @@ class TitleScreen(TextMarkup):
 
 
 class Profile(TextMarkup):
-    def __init__(self, interface: Interface):
+    def __init__(self, interface):
         super().__init__(
             interface,
             TextMap(
@@ -93,7 +104,7 @@ class Profile(TextMarkup):
                         "targets": ButtonWidget(text=f"{Emoji.DIAGRAM} Targets", callback_data="targets_control"),
                     },
                     {
-                        "options": ButtonWidget(text=f'{Emoji.GEAR️} Options', callback_data="options")
+                        "options": ButtonWidget(text=f'{Emoji.GEAR} Options', callback_data="options")
                     },
                     {
                         "title_screen": ButtonWidget(text=f'{Emoji.BACK} Exit', callback_data="title_screen")
@@ -108,7 +119,7 @@ class Profile(TextMarkup):
 
 
 class Options(TextMarkup):
-    def __init__(self, interface: Interface):
+    def __init__(self, interface):
         super().__init__(
             interface,
             TextMap(
@@ -199,7 +210,7 @@ class Options(TextMarkup):
 
 
 class CreatePassword(TextMarkup):
-    def __init__(self, interface: Interface):
+    def __init__(self, interface):
         super().__init__(
             interface,
             text_map=TextMap(
@@ -227,7 +238,7 @@ class CreatePassword(TextMarkup):
 
 
 class RepeatPassword(TextMarkup):
-    def __init__(self, interface: Interface):
+    def __init__(self, interface):
         super().__init__(
             interface,
             text_map=TextMap(
@@ -267,7 +278,7 @@ class PasswordResume(TextMarkup):
         0: f'{Emoji.WARNING}️ Worst'
     }
 
-    def __init__(self, interface: Interface):
+    def __init__(self, interface):
         super().__init__(
             interface,
             text_map=TextMap(
@@ -320,7 +331,7 @@ class PasswordResume(TextMarkup):
 
 
 class CreateEmail(TextMarkup):
-    def __init__(self, interface: Interface):
+    def __init__(self, interface):
         super().__init__(
             interface,
             text_map=TextMap(
@@ -357,7 +368,7 @@ class CreateEmail(TextMarkup):
 
 
 class InputVerifyEmailCode(TextMarkup):
-    def __init__(self, interface: Interface):
+    def __init__(self, interface):
         super().__init__(
             interface,
             text_map=TextMap(
@@ -388,12 +399,12 @@ class InputVerifyEmailCode(TextMarkup):
             await self._interface.basic_manager.update_password(session, state)
 
 
-class NotificationHourCallbackData(CallbackData):
+class NotificationHourCallbackData(CallbackData, prefix="notification_hour"):
     hour: int
 
 
 class ChangeNotificationsHour(TextMarkup):
-    def __init__(self, interface: Interface):
+    def __init__(self, interface):
         super().__init__(
             interface,
             TextMap(
@@ -422,12 +433,12 @@ class ChangeNotificationsHour(TextMarkup):
         self._interface.basic_manager.change_notification_minute.open(state)
 
 
-class NotificationMinuteCallbackData(CallbackData):
+class NotificationMinuteCallbackData(CallbackData, prefix="notification_minute"):
     minute: int
 
 
 class ChangeNotificationsMinute(TextMarkup):
-    def __init__(self, interface: Interface):
+    def __init__(self, interface):
         super().__init__(
             interface,
             TextMap(
@@ -457,7 +468,7 @@ class ChangeNotificationsMinute(TextMarkup):
 
 
 class AuthorizationWithPassword(TextMarkup):
-    def __init__(self, interface: Interface):
+    def __init__(self, interface):
         super().__init__(
             interface,
             text_map=TextMap(

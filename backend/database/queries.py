@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, UTC
 
 import jwt
 from sqlalchemy import update, insert, select, delete
@@ -6,11 +7,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException
 from passlib.handlers.pbkdf2 import pbkdf2_sha256
-from sqlalchemy.orm import selectinload
 
-from backend.database import verify_password, decode_jwt
 from backend.database.models import UserORM, TargetORM
 from backend.routers.models import AuthApiModel, TargetApiModel
+from backend.utils import verify_password, decode_jwt
 
 
 class AuthQueries:
@@ -124,7 +124,7 @@ class TargetsQueries:
             await session.execute(delete(TargetORM).where(TargetORM.id == habit_id))
 
     @staticmethod
-    async def get_user_targets(session: AsyncSession, telegram_id: int):
+    async def get_targets(session: AsyncSession, telegram_id: int):
         return [
             {"name": target.get("name"), "completed": target.get("completed"), "id": target.get("id")}
             for target in (await session.execute(
@@ -134,11 +134,23 @@ class TargetsQueries:
         ]
 
     @staticmethod
+    async def get_completed_targets(session: AsyncSession, telegram_id: int):
+        return [
+            {"name": target.get("name"), "id": target.get("id")}
+            for target in (await session.execute(
+                select(TargetORM.name, TargetORM.id)
+                .filter(
+                TargetORM.user_id == telegram_id,
+                TargetORM.progress == TargetORM.border_progress)
+            )).scalars()
+        ]
+
+    @staticmethod
     async def get_target(session: AsyncSession, target_id: int):
         return (await session.execute(
-                select(TargetORM)
-                .where(TargetORM.id == target_id)
-            )).scalar().as_dict_()
+            select(TargetORM)
+            .where(TargetORM.id == target_id)
+        )).scalar().as_dict_()
 
     @staticmethod
     async def update_name(session: AsyncSession, telegram_id: int, habit_id: int, name: str):
@@ -188,4 +200,7 @@ class TargetsQueries:
             ))
             await session.execute(update(TargetORM).values({"completed": False}).filter(
                 TargetORM.progress != TargetORM.border_progress
+            ))
+            await session.execute(update(TargetORM).values({"completed_datetime": datetime.now(UTC)}).filter(
+                TargetORM.progress == TargetORM.border_progress, TargetORM.completed_datetime is None
             ))

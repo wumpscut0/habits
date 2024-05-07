@@ -1,4 +1,9 @@
-from frontend.routers import *
+from aiogram import Router, F
+from aiogram.filters import StateFilter, Command
+from aiogram.fsm.context import FSMContext
+from aiogram.types import Message, BotCommand
+
+from frontend.controller import Interface
 
 
 abyss_router = Router()

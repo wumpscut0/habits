@@ -1,10 +1,13 @@
 import asyncio
 
-from frontend import dispatcher, bot, scheduler
+from frontend.bot.dispatcher import dispatcher
+from frontend.bot import bot
+from frontend.utils.scheduler import scheduler
 
 
 async def main():
-    await asyncio.gather(scheduler.start(), dispatcher.start_polling(bot))
+    scheduler.start()
+    await dispatcher.start_polling(bot)
 
 
 if __name__ == '__main__':

@@ -3,13 +3,13 @@ from typing import Optional
 from fastapi import HTTPException
 from pydantic import BaseModel, field_validator
 
-from backend import config
+from backend.utils import config
 
-MAX_PASSWORD_LENGTH = config.get('limitations', "MAX_PASSWORD_LENGTH")
+MAX_PASSWORD_LENGTH = config.getint('limitations', "MAX_PASSWORD_LENGTH")
 MAX_EMAIL_LENGTH = config.get('limitations', "MAX_EMAIL_LENGTH")
-MAX_DESCRIPTION_LENGTH = config.get('limitations', "MAX_DESCRIPTION_LENGTH")
-MIN_BORDER_RANGE = config.get('limitations', "MIN_BORDER_RANGE")
-MAX_BORDER_RANGE = config.get('limitations', "MAX_BORDER_RANGE")
+MAX_DESCRIPTION_LENGTH = config.getint('limitations', "MAX_DESCRIPTION_LENGTH")
+MIN_BORDER_RANGE = config.getint('limitations', "MIN_BORDER_RANGE")
+MAX_BORDER_RANGE = config.getint('limitations', "MAX_BORDER_RANGE")
 
 
 class TelegramIdApiModel(BaseModel):

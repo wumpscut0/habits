@@ -1,14 +1,12 @@
 import os
-from typing import Callable, Dict, Any, Awaitable
+from typing import Any, Dict, Callable, Awaitable
 
 from aiogram import BaseMiddleware
-from aiogram.types import TelegramObject, Update
+from aiogram.types import Update, TelegramObject
 from aiohttp import ClientSession
-from apscheduler.triggers.cron import CronTrigger
 
-from frontend import deserialize, scheduler, Interface, DEFAULT_REMAINING_HOUR
-
-from frontend.markups.remainder import remainder
+from frontend.controller import Interface
+from frontend.utils import deserialize
 
 
 class CommonMiddleware(BaseMiddleware):

@@ -1,13 +1,21 @@
 import re
+
 from aiogram.fsm.context import FSMContext
 from aiohttp import ClientSession
 from apscheduler.triggers.cron import CronTrigger
 
-from frontend import Emoji, scheduler, remainder
-from frontend.FSM import States
-from frontend.markups import MAX_NAME_LENGTH, MAX_DESCRIPTION_LENGTH, MIN_BORDER_RANGE, MAX_BORDER_RANGE, \
-    STANDARD_BORDER_RANGE
+from frontend.bot.FSM import States
 from frontend.markups.core import *
+from frontend.utils import config, Emoji
+from frontend.utils.scheduler import scheduler, remainder
+
+MAX_EMAIL_LENGTH = config.getint('limitations', 'MAX_EMAIL_LENGTH')
+MAX_NAME_LENGTH = config.getint('limitations', 'MAX_NAME_LENGTH')
+MAX_DESCRIPTION_LENGTH = config.getint('limitations', 'MAX_DESCRIPTION_LENGTH')
+MAX_PASSWORD_LENGTH = config.getint('limitations', "MAX_PASSWORD_LENGTH")
+MIN_BORDER_RANGE = config.getint('limitations', "MIN_BORDER_RANGE")
+MAX_BORDER_RANGE = config.getint('limitations', "MAX_BORDER_RANGE")
+STANDARD_BORDER_RANGE = config.getint('limitations', "STANDARD_BORDER_RANGE")
 
 
 class CreateTargetCallbackData(CallbackData, prefix="create_target"):
@@ -19,21 +27,24 @@ class ShowTargetCallbackData(CallbackData, prefix='show_target'):
 
 
 class TargetsManager:
-    def __init__(self, interface: Interface):
+    def __init__(self, interface):
         self._interface = interface
         self.targets_control = TargetsControl(interface)
         self.show_up_targets = ShowUpTargets(interface)
+        self.show_up_complete_targets = ShowCompletedTargets(interface)
+        self.completed_target = CompletedTarget(interface)
         self.create_target_name = CreateTargetName(interface)
         self.create_target_border = CreateTargetBorder(interface)
         self.target = Target(interface)
         self.update_target_name = UpdateTargetName(interface)
         self.update_target_description = UpdateTargetDescription(interface)
+        self.conform_delete_target = ConformDeleteTarget(interface)
 
         self.current_target_id = None
 
                 
 class TargetsControl(TextMarkup):
-    def __init__(self, interface: Interface):
+    def __init__(self, interface):
         super().__init__(
             interface,
             TextMap(
@@ -49,11 +60,11 @@ class TargetsControl(TextMarkup):
                             text=f"{Emoji.DIAGRAM} Show up current targets",
                             callback_data="targets"
                         ),
-                        "create_target": ButtonWidget(
+                        "create_target_name": ButtonWidget(
                             text=f'{Emoji.SPROUT} Create new target',
-                            callback_data='create_target'
+                            callback_data='create_target_name'
                         ),
-                        "show_completed": ButtonWidget(
+                        "completed_targets": ButtonWidget(
                             text=f"{Emoji.SHINE_STAR} Show completed targets",
                             callback_data="completed_targets"
                         ),
@@ -84,7 +95,8 @@ class TargetsControl(TextMarkup):
 
         self._interface.storage.update({"target_name": None, "target_border": STANDARD_BORDER_RANGE})
 
-    async def delete_target(self, target_id, session: ClientSession, state: FSMContext):
+    async def delete_target(self, session: ClientSession, state: FSMContext):
+        target_id = self._interface.targets_manager.current_target_id
         async with session.delete(f'/delete_target/{target_id}') as response:
             if response.status == 200:
                 self._interface.feedback.data = f'{Emoji.DENIAL} Target with name {self._interface.storage["targets"][target_id]["name"]} deleted'
@@ -95,8 +107,151 @@ class TargetsControl(TextMarkup):
                 await self._interface.handling_unexpected_error(state)
 
 
+class ShowCompletedTargetCallbackData(CallbackData, prefix="show_completed_target"):
+    id: int
+
+
+class ShowCompletedTargets(TextMarkup):
+    def __init__(self, interface):
+        super().__init__(
+            interface,
+            TextMap(
+                {
+                    "info": DataTextWidget(header="Total completed")
+                }
+            ),
+        )
+
+    async def open(self, state: FSMContext, **kwargs):
+        async with kwargs["session"].get('/completed_targets') as response:
+            if response.status == 200:
+                targets = await response.json()
+                self.text_map["info"].data = len(targets)
+                for target in targets:
+                    await self.markup_map.add_buttons(
+                        {
+                            "name": ButtonWidget(
+                                text=target["name"],
+                                callback_data=ShowCompletedTargetCallbackData(id=kwargs["target_id"])
+                            )
+                        }
+                    )
+                await super().open(state)
+            elif response.status == 404:
+                self._interface.feedback.data = "no completed targets so far"
+                await self._interface.targets_manager.targets_control.open(state)
+            elif response.status == 401:
+                await self._interface.close_session(state)
+            else:
+                await self._interface.handling_unexpected_error(state)
+
+
+class CompletedTarget(TextMarkup):
+    def __init__(self, interface):
+        super().__init__(
+            interface,
+            TextMap(
+                {
+                    "create_datetime": DataTextWidget(header="Create target date"),
+                    "completed_datetime": DataTextWidget(header="Completed target date"),
+                    "name": DataTextWidget(header=f'{Emoji.DART} Name'),
+                    "description": DataTextWidget(header=f'{Emoji.LIST_WITH_PENCIL} Description'),
+                }
+            ),
+            MarkupMap(
+                [
+                    {
+                        "delete_target": ButtonWidget(text=f'{Emoji.DENIAL} Delete', callback_data="conform_delete_target"),
+                    },
+                    {
+                        "back": ButtonWidget(text=f"{Emoji.BACK}", callback_data="completed_targets")
+                    }
+                ]
+            )
+        )
+
+    async def open(self, state, **kwargs):
+        self._interface.targets_manager.current_target_id = kwargs["target_id"]
+        async with kwargs["session"].get(f"/target/{kwargs['target_id']}") as response:
+            target = await response.json()
+
+        self.text_map['name'].data = target["name"]
+
+        if target.description is None:
+            self.text_map['description'].off()
+        else:
+            self.text_map['description'].data = target["description"]
+
+        self.text_map["create_datetime"].data = target["create_datetime"]
+
+        self.text_map['completed_datetime'].data = target["completed_datetime"]
+
+        await super().open(state)
+
+
+class CreateTargetName(TextMarkup):
+    def __init__(self, interface):
+        super().__init__(
+            interface,
+            TextMap(
+                {
+                    "action": TextWidget(f"{Emoji.BULB} Enter the target name"),
+                }
+            ),
+            MarkupMap(
+                [
+                    {
+                        "back": ButtonWidget(text=f"{Emoji.DENIAL} Cancel")
+                    }
+                ]
+            ),
+            States.create_target_name
+        )
+
+    async def __call__(self, name: str, session: ClientSession, state: FSMContext):
+        self._interface.storage["target_border"] = STANDARD_BORDER_RANGE
+
+        if len(name) > MAX_NAME_LENGTH:
+            self._interface.feedback.data = f"Maximum name length is {MAX_NAME_LENGTH} simbols"
+            await self.open(state)
+        elif not re.fullmatch(r'[\w\s]+', name, flags=re.I):
+            self._interface.feedback.data = f"Name must contains only latin symbols or _ or spaces or digits"
+            await self.open(state)
+        else:
+            await self._interface.targets_manager.input_target_border.open(state)
+
+
+class CreateTargetBorder(TextMarkup):
+    def __init__(self, interface):
+        super().__init__(
+            interface,
+            TextMap(
+                {
+                    "action": TextWidget(f'{Emoji.FLAG_FINISH} Enter target border at {MIN_BORDER_RANGE} to {MAX_BORDER_RANGE}\n'
+                                         F'(By default border is {STANDARD_BORDER_RANGE} days. This value is standard for fixation target)')
+                },
+            ),
+            MarkupMap(
+                [
+                    {
+                        "skip": ButtonWidget(text=f'{Emoji.SKIP} Skip', callback_data="create_target")
+                    }
+                ]
+            ),
+            States.create_target_border
+        )
+
+    def __call__(self, session: ClientSession, state: FSMContext, border: str):
+        if not re.fullmatch(r'\d{1,3}', border):
+            self._interface.feedback.data = f'Border value must be integer and at {MIN_BORDER_RANGE} to {MAX_BORDER_RANGE}'
+            self.open(state)
+        else:
+            self._interface.storage['target_border'] = int(border)
+            self._interface.targets_manager.targets_control.create_target(session, state)
+
+
 class ShowUpTargets(TextMarkup):
-    def __init__(self, interface: Interface):
+    def __init__(self, interface):
         super().__init__(
             interface,
             TextMap(
@@ -138,6 +293,9 @@ class ShowUpTargets(TextMarkup):
 
                 self.text_map['info'].data = f'{total_completed}/{total_targets}'
                 await super().open(state)
+            elif response.status == 404:
+                self._interface.feedback.data = "No targets so far"
+                await super().open(state)
             elif response.status == 401:
                 await self._interface.close_session(state)
             else:
@@ -145,7 +303,7 @@ class ShowUpTargets(TextMarkup):
 
 
 class Target(TextMarkup):
-    def __init__(self, interface: Interface):
+    def __init__(self, interface):
         super().__init__(
             interface,
             TextMap(
@@ -161,7 +319,7 @@ class Target(TextMarkup):
                     {
                         "update_name": ButtonWidget(text=f'{Emoji.NEW} Update name', callback_data="update_target_name"),
                         "update_description": ButtonWidget(text=f'{Emoji.NEW} Update description', callback_data="update_target_description"),
-                        "delete_target": ButtonWidget(text=f'{Emoji.DENIAL} Delete', callback_data="delete_target"),
+                        "delete_target": ButtonWidget(text=f'{Emoji.DENIAL} Delete', callback_data="conform_delete_target"),
                         "completed": ButtonWidget(callback_data="invert_completed")
                     },
                     {
@@ -194,7 +352,8 @@ class Target(TextMarkup):
 
         await super().open(state)
 
-    async def invert_complete(self, session: ClientSession, state: FSMContext, target_id: int):
+    async def invert_complete(self, session: ClientSession, state: FSMContext):
+        target_id = self._interface.targets_manager.current_target_id
         async with session.patch(f'/invert_target_completed/{target_id}') as response:
             if response.status == 200:
                 response = await response.text()
@@ -214,7 +373,7 @@ class Target(TextMarkup):
 
 
 class UpdateTargetName(TextMarkup):
-    def __init__(self, interface: Interface):
+    def __init__(self, interface):
         super().__init__(
             interface,
             TextMap(
@@ -230,7 +389,6 @@ class UpdateTargetName(TextMarkup):
                 ]
             ),
             States.update_target_name
-
         )
 
     async def __call__(self, name: str, session: ClientSession, state: FSMContext):
@@ -252,7 +410,7 @@ class UpdateTargetName(TextMarkup):
 
 
 class UpdateTargetDescription(TextMarkup):
-    def __init__(self, interface: Interface):
+    def __init__(self, interface):
         super().__init__(
             interface,
             TextMap(
@@ -270,7 +428,8 @@ class UpdateTargetDescription(TextMarkup):
             States.update_target_description
         )
 
-    async def __call__(self, target_id, description, session: ClientSession, state: FSMContext):
+    async def __call__(self, description, session: ClientSession, state: FSMContext):
+        target_id = self._interface.targets_manager.current_target_id
         if len(description) > MAX_DESCRIPTION_LENGTH:
             self._interface.feedback.data = f"Maximum description length is {MAX_DESCRIPTION_LENGTH} simbols"
             await self.open(state, target_id=target_id)
@@ -290,7 +449,7 @@ class UpdateTargetDescription(TextMarkup):
 
 
 class ConformDeleteTarget(TextMarkup):
-    def __init__(self, interface: Interface):
+    def __init__(self, interface):
         super().__init__(
             interface,
             TextMap(
@@ -305,67 +464,5 @@ class ConformDeleteTarget(TextMarkup):
                         "back": ButtonWidget(text=f"{Emoji.DENIAL} Cancel", callback_data="target")
                     }
                 ]
-            ),
-            States.update_target_description
+            )
         )
-
-
-class CreateTargetName(TextMarkup):
-    def __init__(self, interface: Interface):
-        super().__init__(
-            interface,
-            TextMap(
-                {
-                    "action": TextWidget(f"{Emoji.BULB} Enter the target name"),
-                }
-            ),
-            MarkupMap(
-                [
-                    {
-                        "back": ButtonWidget(text=f"{Emoji.DENIAL} Cancel")
-                    }
-                ]
-            ),
-            States.create_target_name
-        )
-
-    async def __call__(self, session: ClientSession, name: str, state: FSMContext, target_id: int):
-        self._interface.storage["border"] = STANDARD_BORDER_RANGE
-
-        if len(name) > MAX_NAME_LENGTH:
-            self._interface.feedback.data = f"Maximum name length is {MAX_NAME_LENGTH} simbols"
-            await self.open(state, target_id=target_id)
-        elif not re.fullmatch(r'[\w\s]+', name, flags=re.I):
-            self._interface.feedback.data = f"Name must contains only latin symbols or _ or spaces or digits"
-            await self.open(state, target_id=target_id)
-        else:
-            await self._interface.targets_manager.input_target_border.open(state, target_id=target_id)
-
-
-class CreateTargetBorder(TextMarkup):
-    def __init__(self, interface: Interface):
-        super().__init__(
-            interface,
-            TextMap(
-                {
-                    "action": TextWidget(f'{Emoji.FLAG_FINISH} Enter target border at {MIN_BORDER_RANGE} to {MAX_BORDER_RANGE}\n'
-                                         F'(By default border is {STANDARD_BORDER_RANGE} days. This value is standard for fixation target)')
-                },
-            ),
-            MarkupMap(
-                [
-                    {
-                        "skip": ButtonWidget(text=f'{Emoji.SKIP} Skip', callback_data="create_target")
-                    }
-                ]
-            ),
-            States.create_target_border
-        )
-
-    def __call__(self, session: ClientSession, state: FSMContext, border: str, target_id: int):
-        if not re.fullmatch(r'\d{1,3}', border):
-            self._interface.feedback.data = f'Border value must be integer and at {MIN_BORDER_RANGE} to {MAX_BORDER_RANGE}'
-            self.open(state, target_id=target_id)
-        else:
-            self._interface.storage['target_border'] = int(border)
-            self._interface.targets_manager.targets_control.create_target(session, state)
