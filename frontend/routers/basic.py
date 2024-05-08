@@ -14,8 +14,8 @@ basic_router = Router()
 
 
 @basic_router.message(CommandStart())
-async def open_tittle_screen(message: Message, interface: Interface, state: FSMContext):
-    await interface.open_session(state)
+async def open_tittle_screen(message: Message, interface: Interface, state: FSMContext, session: ClientSession):
+    await interface.open_session(state, session)
     await message.delete()
 
 
@@ -24,7 +24,7 @@ async def open_tittle_screen(callback: CallbackQuery, interface: Interface, stat
     await interface.close_session(state)
 
 
-@basic_router.callback_query(F.data == 'invert_notifications')
+@basic_router.callback_query(F.data == 'invert notifications')
 async def invert_notifications(callback: CallbackQuery, interface: Interface, state: FSMContext, session: ClientSession):
     await interface.basic_manager.title_screen.invert_notifications(session, state)
 

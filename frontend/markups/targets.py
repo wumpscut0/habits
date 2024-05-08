@@ -6,7 +6,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from frontend.bot.FSM import States
 from frontend.markups.core import *
-from frontend.utils import config, Emoji
+from frontend.utils import config, Emoji, encode_jwt
 from frontend.utils.scheduler import scheduler, remainder
 
 MAX_EMAIL_LENGTH = config.getint('limitations', 'MAX_EMAIL_LENGTH')
@@ -82,7 +82,7 @@ class TargetsControl(TextMarkup):
             "border": border
         }) as response:
             if response.status == 200:
-                self._interface.feedback.data = f'{Emoji.SPROUT} Target with name {name} created'
+                await self._interface.update_feedback(f'{Emoji.SPROUT} Target with name {name} created')
                 async with session.get('/notification_time') as response_:
                     time = (await response_.json())
                     hour, minute = time["hour"], time['minute']
@@ -99,12 +99,17 @@ class TargetsControl(TextMarkup):
         target_id = self._interface.targets_manager.current_target_id
         async with session.delete(f'/delete_target/{target_id}') as response:
             if response.status == 200:
-                self._interface.feedback.data = f'{Emoji.DENIAL} Target with name {self._interface.storage["targets"][target_id]["name"]} deleted'
+                async with session.get(f"/is_all_done/{self._interface.user_encode_id}") as response_:
+                    if await response_.text() == "1":
+                        scheduler.remove_job(job_id=self._interface.chat_id)
+
+                await self._interface.update_feedback(f'{Emoji.DENIAL} Target with name {self._interface.storage["targets"][target_id]["name"]} deleted')
                 await self._interface.targets_manager.show_up_targets.open(state)
+
             elif response.status == 401:
                 await self._interface.close_session(state)
             else:
-                await self._interface.handling_unexpected_error(state)
+                await self._interface.handling_unexpected_error(state, response)
 
 
 class ShowCompletedTargetCallbackData(CallbackData, prefix="show_completed_target"):
@@ -138,7 +143,7 @@ class ShowCompletedTargets(TextMarkup):
                     )
                 await super().open(state)
             elif response.status == 404:
-                self._interface.feedback.data = "no completed targets so far"
+                await self._interface.update_feedback("no completed targets so far")
                 await self._interface.targets_manager.targets_control.open(state)
             elif response.status == 401:
                 await self._interface.close_session(state)
@@ -212,10 +217,10 @@ class CreateTargetName(TextMarkup):
         self._interface.storage["target_border"] = STANDARD_BORDER_RANGE
 
         if len(name) > MAX_NAME_LENGTH:
-            self._interface.feedback.data = f"Maximum name length is {MAX_NAME_LENGTH} simbols"
+            await self._interface.update_feedback(f"Maximum name length is {MAX_NAME_LENGTH} simbols")
             await self.open(state)
         elif not re.fullmatch(r'[\w\s]+', name, flags=re.I):
-            self._interface.feedback.data = f"Name must contains only latin symbols or _ or spaces or digits"
+            await self._interface.update_feedback(f"Name must contains only latin symbols or _ or spaces or digits")
             await self.open(state)
         else:
             await self._interface.targets_manager.input_target_border.open(state)
@@ -241,10 +246,10 @@ class CreateTargetBorder(TextMarkup):
             States.create_target_border
         )
 
-    def __call__(self, session: ClientSession, state: FSMContext, border: str):
+    async def __call__(self, session: ClientSession, state: FSMContext, border: str):
         if not re.fullmatch(r'\d{1,3}', border):
-            self._interface.feedback.data = f'Border value must be integer and at {MIN_BORDER_RANGE} to {MAX_BORDER_RANGE}'
-            self.open(state)
+            await self._interface.update_feedback(f'Border value must be integer and at {MIN_BORDER_RANGE} to {MAX_BORDER_RANGE}')
+            await self.open(state)
         else:
             self._interface.storage['target_border'] = int(border)
             self._interface.targets_manager.targets_control.create_target(session, state)
@@ -294,7 +299,7 @@ class ShowUpTargets(TextMarkup):
                 self.text_map['info'].data = f'{total_completed}/{total_targets}'
                 await super().open(state)
             elif response.status == 404:
-                self._interface.feedback.data = "No targets so far"
+                await self._interface.update_feedback("No targets so far")
                 await super().open(state)
             elif response.status == 401:
                 await self._interface.close_session(state)
@@ -369,7 +374,7 @@ class Target(TextMarkup):
             elif response.status == 401:
                 await self._interface.close_session(state)
             else:
-                await self._interface.handling_unexpected_error(state)
+                await self._interface.handling_unexpected_error(state, response)
 
 
 class UpdateTargetName(TextMarkup):
@@ -394,10 +399,10 @@ class UpdateTargetName(TextMarkup):
     async def __call__(self, name: str, session: ClientSession, state: FSMContext):
         target_id = self._interface.targets_manager.current_target_id
         if len(name) > MAX_NAME_LENGTH:
-            self._interface.feedback.data = f"Maximum name length is {MAX_NAME_LENGTH} simbols"
+            await self._interface.update_feedback(f"Maximum name length is {MAX_NAME_LENGTH} simbols")
             await self.open(state, target_id=target_id)
         elif not re.fullmatch(r'[\w\s]+', name, flags=re.I):
-            self._interface.feedback.data = f"Name must contains only latin symbols or _ or spaces or digits"
+            await self._interface.update_feedback(f"Name must contains only latin symbols or _ or spaces or digits")
             await self.open(state, target_id=target_id)
         else:
             async with session.patch(f'/update_target_name/{target_id}?name={name}') as response:
@@ -431,10 +436,10 @@ class UpdateTargetDescription(TextMarkup):
     async def __call__(self, description, session: ClientSession, state: FSMContext):
         target_id = self._interface.targets_manager.current_target_id
         if len(description) > MAX_DESCRIPTION_LENGTH:
-            self._interface.feedback.data = f"Maximum description length is {MAX_DESCRIPTION_LENGTH} simbols"
+            await self._interface.update_feedback(f"Maximum description length is {MAX_DESCRIPTION_LENGTH} simbols")
             await self.open(state, target_id=target_id)
         elif not re.fullmatch(r'[\w\s]+', description, flags=re.I):
-            self._interface.feedback.data = f"Description must contains only latin symbols or _ or spaces or digits"
+            await self._interface.update_feedback(f"Description must contains only latin symbols or _ or spaces or digits")
             await self.open(state, target_id=target_id)
         else:
             async with session.patch(f'/update_target_description/{target_id}?description={description}') as response:

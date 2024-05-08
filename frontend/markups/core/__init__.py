@@ -35,9 +35,9 @@ class Resettable:
 
 class TextWidget(Hideable, Resettable):
     def __init__(self, text: str = None, active=True):
-        super(Hideable, self).__init__(active)
+        super().__init__(active)
         self._text = text
-        super(Resettable, self).__init__(self)
+        super(Hideable, self).__init__(self)
 
     def __repr__(self):
         return self.text
@@ -46,7 +46,8 @@ class TextWidget(Hideable, Resettable):
     def text(self):
         if self._text is None:
             return Text(Emoji.BAN)
-        return Bold(self._text)
+        if self.active:
+            return Bold(self._text)
 
     @text.setter
     def text(self, value):
@@ -64,13 +65,13 @@ class DataTextWidget(Hideable, Resettable):
             end: str = '',
             active=True
     ):
-        super(Hideable, self).__init__(active)
+        super().__init__(active)
         self.header = header
         self.data = data
         self.mark = mark
         self.sep = sep
         self.end = end
-        super(Resettable, self).__init__(self)
+        super(Hideable, self).__init__(self)
 
     def __repr__(self):
         return self.text.as_html()
@@ -78,9 +79,10 @@ class DataTextWidget(Hideable, Resettable):
     @property
     def text(self):
         if self.header is None:
-            return Emoji.BAN
-        separator = '' if str(self.header).startswith(' ') else ' '
-        return Text(self.mark) + Text(separator) + Bold(self.header) + Text(self.sep) + Italic(self.data) + Italic(self.end)
+            return Text(Emoji.BAN)
+        if self.active:
+            separator = '' if str(self.header).startswith(' ') else ' '
+            return Text(self.mark) + Text(separator) + Bold(self.header) + Text(self.sep) + Italic(self.data) + Italic(self.end)
 
 
 class ButtonWidget(Hideable, Resettable):
@@ -92,18 +94,19 @@ class ButtonWidget(Hideable, Resettable):
             mark: str = '',
             active=True
     ):
-        super(Hideable, self).__init__(active)
+        super().__init__(active)
         self.text = text
         self.callback_data = callback_data
         self.mark = mark
-        super(Resettable, self).__init__(self)
+        super(Hideable, self).__init__(self)
 
     @property
     def button(self):
         if not self.text or not self.callback_data:
             return InlineKeyboardButton(text=Emoji.BAN, callback_data='None')
-        separator = '' if self.text.startswith(' ') else ' '
-        return InlineKeyboardButton(text=self.mark + separator + self.text, callback_data=self.callback_data)
+        if self.active:
+            separator = '' if self.text.startswith(' ') else ' '
+            return InlineKeyboardButton(text=self.mark + separator + self.text, callback_data=self.callback_data)
 
 
 # class PhotoMarkup:
@@ -125,7 +128,7 @@ class TextMap:
 
     @property
     async def text(self):
-        return (as_list(*[row.text for row in self._map.values() if row.active])).as_html()
+        return (as_list(*[row.text for row in self._map.values() if row.text is not None])).as_html()
 
     def __getitem__(self, name):
         return self._map[name]
@@ -147,7 +150,7 @@ class MarkupMap:
     @property
     async def markup(self):
         return InlineKeyboardBuilder(
-            [[button.button for button in row.values() if button.active] for row in self._map]
+            [[button.button for button in row.values() if button.button is not None] for row in self._map]
         ).as_markup()
 
     def __getitem__(self, name):
@@ -181,12 +184,12 @@ class TextMarkup:
 
     @property
     async def text(self):
-        return self.text_map.text
+        return await self.text_map.text
 
     @property
     async def markup(self):
-        if self.markup_map.markup is not None:
-            return self.markup_map.markup
+        if await self.markup_map.markup is not None:
+            return await self.markup_map.markup
 
     async def reset(self):
         await self.text_map.reset()

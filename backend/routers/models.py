@@ -23,11 +23,12 @@ class AuthApiModel(BaseModel):
     @field_validator('password', mode='before')
     @classmethod
     def password_validate(cls, password):
-        if len(password) > MAX_PASSWORD_LENGTH:
-            raise HTTPException(
-                400,
-                detail=f'Maximum password length is {MAX_PASSWORD_LENGTH}'
-            )
+        if password is not None:
+            if len(password) > MAX_PASSWORD_LENGTH:
+                raise HTTPException(
+                    400,
+                    detail=f'Maximum password length is {MAX_PASSWORD_LENGTH}'
+                )
         return password
 
 

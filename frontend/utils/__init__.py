@@ -2,6 +2,9 @@ import os
 import pickle
 from base64 import b64decode, b64encode
 from configparser import ConfigParser
+from typing import Dict
+
+import jwt
 
 
 class Emoji:
@@ -58,3 +61,13 @@ async def deserialize(sequence: str):
 config = ConfigParser()
 
 config.read(os.path.abspath(os.path.join(os.path.dirname(__file__), "config.ini")))
+
+
+async def get_service_key():
+    return jwt.encode({"password": os.getenv('SERVICES_PASSWORD')}, os.getenv('JWT'))
+
+
+async def encode_jwt(payload: Dict):
+    return jwt.encode(payload, os.getenv('JWT'))
+
+

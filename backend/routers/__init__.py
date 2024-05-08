@@ -55,12 +55,11 @@ async def delete_password(Authorization: Annotated[str, Header()]):
         await CommonQueries.delete_password(session, telegram_id)
 
 
-@app.patch("/invert_notification/{key}/{user_id}")
-async def invert_notification(key: str, user_id: int):
-    if os.getenv('SERVICES_PASSWORD') != (await decode_jwt(key))['password']:
-        raise HTTPException(401)
+@app.patch("/invert_notifications/{user_id}")
+async def invert_notification(user_id: str):
+    data = await decode_jwt(user_id)
     async with Session.begin() as session:
-        return await CommonQueries.invert_user_notifications(session, user_id)
+        return await CommonQueries.invert_user_notifications(session, data["telegram_id"])
 
 
 @app.get("/notification_time")
@@ -74,13 +73,13 @@ async def get_notification_time(Authorization: Annotated[str, Header()]):
         }
 
 
-@app.get("notification_is_on")
-async def notification_is_on(Authorization: Annotated[str, Header()]):
+@app.get("/notification_is_on/{user_id}")
+async def notification_is_on(user_id: str):
+    data = await decode_jwt(user_id)
     async with Session.begin() as session:
-        telegram_id = await AuthQueries.authentication(session, Authorization)
-        if CommonQueries.notification_time_is_on(session, telegram_id):
-            return '1'
-        raise "0"
+        if await CommonQueries.notification_is_on(session, data["telegram_id"]):
+            return 1
+        return 0
 
 
 @app.patch("/notification_time")
@@ -163,12 +162,12 @@ async def invert_target_completed(target_id: int, Authorization: Annotated[str, 
         return await TargetsQueries.invert_completed(session, telegram_id, target_id)
 
 
-@app.get('/is_all_done')
-async def is_all_done(Authorization: Annotated[str, Header()]):
+@app.get('/is_all_done/{user_id}')
+async def notification_is_on(user_id: str):
+    data = await decode_jwt(user_id)
     async with Session.begin() as session:
-        telegram_id = await AuthQueries.authentication(session, Authorization)
-        result = await TargetsQueries.is_all_done(session, telegram_id)
-        if result == "1":
+        result = await TargetsQueries.is_all_done(session, data["telegram_id"])
+        if result:
             return result
         else:
             return {
@@ -182,7 +181,7 @@ async def increase_targets_progress(key: str):
     if os.getenv('SERVICES_PASSWORD') != (await decode_jwt(key))['password']:
         raise HTTPException(401)
     async with Session.begin() as session:
-        await TargetsQueries.increase_progress(session)
+        return await TargetsQueries.increase_progress(session)
 
 
 @app.get('/users_ids/{key}')
@@ -196,7 +195,7 @@ async def increase_targets_progress(key: str):
 @app.middleware('http')
 async def error_abyss(request: Request, call_next):
     try:
-        return call_next(request)
+        return await call_next(request)
     except Exception as e:
         errors.error(e)
         raise HTTPException(500)

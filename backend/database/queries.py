@@ -18,7 +18,6 @@ class AuthQueries:
     async def registration(session: AsyncSession, telegram_id: int):
         try:
             await session.execute(insert(UserORM).values({"telegram_id": telegram_id}))
-            await session.commit()
         except IntegrityError:
             raise HTTPException(409, "User already exists")
 
@@ -56,7 +55,7 @@ class CommonQueries:
             await session.execute(select(UserORM.notification_time).where(UserORM.telegram_id == telegram_id))).scalar()
 
     @staticmethod
-    async def notification_time_is_on(session: AsyncSession, telegram_id: int):
+    async def notification_is_on(session: AsyncSession, telegram_id: int):
         return (await session.execute(select(UserORM.notifications).where(UserORM.telegram_id == telegram_id))).scalar()
 
     @staticmethod
@@ -79,28 +78,22 @@ class CommonQueries:
 
     @staticmethod
     async def update_password(session: AsyncSession, telegram_id: int, hash_: str):
-        async with session.begin():
-            await session.execute(update(UserORM).where(UserORM.telegram_id == telegram_id).values({"password": hash_}))
+        await session.execute(update(UserORM).where(UserORM.telegram_id == telegram_id).values({"password": hash_}))
 
     @staticmethod
     async def delete_password(session: AsyncSession, telegram_id: int):
-        async with session.begin():
-            await session.execute(delete(UserORM.hash).where(UserORM.telegram_id == telegram_id))
+        await session.execute(delete(UserORM.hash).where(UserORM.telegram_id == telegram_id))
 
     @staticmethod
     async def update_email(session: AsyncSession, telegram_id: int, email: str):
-        async with session.begin():
-            await session.execute(update(UserORM).where(UserORM.telegram_id == telegram_id).values({"email": email}))
+        await session.execute(update(UserORM).where(UserORM.telegram_id == telegram_id).values({"email": email}))
 
     @staticmethod
     async def invert_user_notifications(session: AsyncSession, telegram_id: int):
-        async with session.begin():
-            notifications = (
-                await session.execute(select(UserORM.notifications).where(UserORM.telegram_id == telegram_id))).scalar()
-            await session.execute(
-                update(UserORM).where(UserORM.telegram_id == telegram_id).values({"notifications": not notifications})
-            )
-        return "1" if notifications else "0"
+        notifications = (await session.execute(select(UserORM.notifications).where(UserORM.telegram_id == telegram_id))).scalar()
+        await session.execute(update(UserORM).where(UserORM.telegram_id == telegram_id).values({"notifications": not notifications}))
+
+        return 0 if notifications else 1
 
 
 class TargetsQueries:
@@ -120,8 +113,7 @@ class TargetsQueries:
 
     @staticmethod
     async def delete(session: AsyncSession, habit_id: int):
-        async with session.begin():
-            await session.execute(delete(TargetORM).where(TargetORM.id == habit_id))
+        await session.execute(delete(TargetORM).where(TargetORM.id == habit_id))
 
     @staticmethod
     async def get_targets(session: AsyncSession, telegram_id: int):
@@ -154,53 +146,52 @@ class TargetsQueries:
 
     @staticmethod
     async def update_name(session: AsyncSession, telegram_id: int, habit_id: int, name: str):
-        async with session.begin():
-            await session.execute(
-                update(TargetORM)
-                .values({'name': name})
-                .filter(TargetORM.user_id == telegram_id, TargetORM.id == habit_id)
-            )
+        await session.execute(
+            update(TargetORM)
+            .values({'name': name})
+            .filter(TargetORM.user_id == telegram_id, TargetORM.id == habit_id)
+        )
 
     @staticmethod
     async def update_description(session: AsyncSession, telegram_id: int, habit_id: int, description: str):
-        async with session.begin():
-            await session.execute(
-                update(TargetORM)
-                .values({'description': description})
-                .filter(TargetORM.user_id == telegram_id, TargetORM.id == habit_id)
-            )
+        await session.execute(
+            update(TargetORM)
+            .values({'description': description})
+            .filter(TargetORM.user_id == telegram_id, TargetORM.id == habit_id)
+        )
 
     @staticmethod
     async def invert_completed(session: AsyncSession, telegram_id: int, habit_id: int):
-        async with session.begin():
-            target = (await session.execute(
-                select(TargetORM.completed)
-                .filter(TargetORM.user_id == telegram_id, TargetORM.id == habit_id)
-            )).scalar()
+        target = (await session.execute(
+            select(TargetORM.completed)
+            .filter(TargetORM.user_id == telegram_id, TargetORM.id == habit_id)
+        )).scalar()
 
-            await session.execute(
-                update(TargetORM)
-                .values({'completed': not target.completed})
-                .filter(TargetORM.user_id == telegram_id, TargetORM.id == habit_id)
+        await session.execute(
+            update(TargetORM)
+            .values({'completed': not target.completed})
+            .filter(TargetORM.user_id == telegram_id, TargetORM.id == habit_id)
 
-            )
-            return '1' if target.completed else '0'
+        )
+        return 1 if target.completed else 0
 
     @staticmethod
     async def is_all_done(session: AsyncSession, telegram_id: int):
-        return '1' if all((await session.execute(select(TargetORM.completed).where(UserORM.telegram_id == telegram_id)))
+        return 1 if all((await session.execute(select(TargetORM.completed).where(UserORM.telegram_id == telegram_id)))
                           .scalars()) else (
             await session.execute(select(UserORM.notification_time).where(UserORM.telegram_id == telegram_id))).scalar()
 
     @staticmethod
     async def increase_progress(session: AsyncSession):
-        async with session.begin():
-            await session.execute(update(TargetORM).values({"progress": TargetORM.progress + 1}).filter(
-                TargetORM.progress + 1 <= TargetORM.border_progress, TargetORM.completed
-            ))
-            await session.execute(update(TargetORM).values({"completed": False}).filter(
-                TargetORM.progress != TargetORM.border_progress
-            ))
-            await session.execute(update(TargetORM).values({"completed_datetime": datetime.now(UTC)}).filter(
-                TargetORM.progress == TargetORM.border_progress, TargetORM.completed_datetime is None
-            ))
+        await session.execute(update(TargetORM).values({"progress": TargetORM.progress + 1}).filter(
+            TargetORM.progress + 1 <= TargetORM.border_progress, TargetORM.completed
+        ))
+        await session.execute(update(TargetORM).values({"completed": False}).filter(
+            TargetORM.progress != TargetORM.border_progress
+        ))
+        await session.execute(update(TargetORM).values({"completed_datetime": datetime.now(UTC)}).filter(
+            TargetORM.progress == TargetORM.border_progress, TargetORM.completed_datetime is None
+        ))
+        sub = select(TargetORM.user_id).filter(not TargetORM.completed)
+        return (await session.execute(select(UserORM.telegram_id, UserORM.notification_time)
+                               .filter(UserORM.notifications, UserORM.telegram_id in sub))).scalars()

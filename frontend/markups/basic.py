@@ -11,7 +11,7 @@ from zxcvbn import zxcvbn
 from frontend.bot.FSM import States
 from frontend.markups.core import TextMarkup, TextMap, TextWidget, MarkupMap, ButtonWidget, DataTextWidget
 
-from frontend.utils import Emoji, config
+from frontend.utils import Emoji, config, get_service_key, encode_jwt
 from frontend.utils.mailing import Mailing
 from frontend.utils.scheduler import scheduler, reset_verify_code
 
@@ -53,7 +53,7 @@ class TitleScreen(TextMarkup):
             MarkupMap(
                 [
                     {
-                        "sign_in": ButtonWidget(text=f'{Emoji.DOOR}', callback_data='authorization'),
+                        "sign_in": ButtonWidget(text=f'{Emoji.DOOR} Sign in', callback_data='authorization'),
                     },
                     {
                         "notifications": ButtonWidget(
@@ -73,20 +73,24 @@ class TitleScreen(TextMarkup):
             elif response.status == 200:
                 await self._interface.basic_manager.profile.open(state)
             else:
-                self._interface.feedback.data = 'Internal server error'
-                await self.open(state)
+                await self._interface.handling_unexpected_error(state)
 
     async def invert_notifications(self, session: ClientSession, state: FSMContext):
-        async with session.patch('/invert_notifications', json={'telegram_id': self._interface.chat_id}) as response:
-            response = await response.text()
-        if response == '1':
+        token = await encode_jwt({"telegram_id": self._interface.chat_id})
+        async with session.patch(f'/invert_notifications/{token}') as response:
+            content = await response.text()
+        if content == '1':
             self.markup_map["notifications"].mark = Emoji.BELL
-        elif response == '0':
+            async with session.get(f"/is_all_done/{self._interface.user_encode_id}") as response_:
+                if await response_.text() != "1":
+                    scheduler.add_job(self._interface.chat_id)
+            await self.open(state)
+        elif content == '0':
+            scheduler.remove_job(self._interface.chat_id)
             self.markup_map["notifications"].mark = Emoji.NOT_BELL
+            await self.open(state)
         else:
-            await self.text_map['feedback'].update_text('Internal server error')
-
-        await self.open(state)
+            await self._interface.handling_unexpected_error(state, response)
 
 
 class Profile(TextMarkup):
@@ -173,7 +177,7 @@ class Options(TextMarkup):
                     feedback = f'{Emoji.OK} Password updated'
                 else:
                     feedback = f'{Emoji.OK} Password and email updated'
-                self._interface.feedback.data = feedback
+                await self._interface.update_feedback(feedback)
 
                 self._interface.basic_manager.options.markup_map['delete_password'].on()
                 await self._interface.basic_manager.profile.open(state)
@@ -186,7 +190,7 @@ class Options(TextMarkup):
         async with session.delete("delete_password") as response:
             if response.status == 200:
                 self.markup_map["delete_password"].off()
-                self._interface.feedback.data = "password deleted"
+                await self._interface.update_feedback("password deleted")
                 await self.open(state)
             elif response.status == 401:
                 await self._interface.close_session(state)
@@ -230,7 +234,7 @@ class CreatePassword(TextMarkup):
 
     async def __call__(self, password: str, state: FSMContext):
         if len(password) > MAX_PASSWORD_LENGTH:
-            self._interface.feedback.data = f"Maximum password length is {MAX_PASSWORD_LENGTH} symbols"
+            await self._interface.update_feedback(f"Maximum password length is {MAX_PASSWORD_LENGTH} symbols")
             await self.open(state)
         else:
             self._interface.storage['password'] = password
@@ -258,7 +262,7 @@ class RepeatPassword(TextMarkup):
 
     async def __call__(self, password: str, state: FSMContext):
         if password != self._interface.storage['password']:
-            self._interface.feedback.data = "Passwords not matched"
+            await self._interface.update_feedback("Passwords not matched")
             await self._interface.basic_manager.input_password.open(state)
         else:
             self._interface.storage.update({
@@ -351,13 +355,13 @@ class CreateEmail(TextMarkup):
 
     async def __call__(self, email: str, state):
         if len(email) > MAX_EMAIL_LENGTH:
-            self._interface.feedback.data = f'Max email length is {MAX_EMAIL_LENGTH} symbols.'
+            await self._interface.update_feedback(f'Max email length is {MAX_EMAIL_LENGTH} symbols.')
             await self.open(state)
         elif not re.fullmatch(r'\w+@\w+\.\w+', email, flags=re.I):
-            self._interface.feedback.data = 'Allowable format is example@email.com'
+            await self._interface.update_feedback('Allowable format is example@email.com')
             await self.open(state)
         else:
-            self._interface.feedback.data = f'Verify code sended on your email {email}'
+            await self._interface.update_feedback(f'Verify code sended on your email {email}')
             scheduler.add_job(reset_verify_code, "date", (self._interface,),
                               run_date=datetime.now() + timedelta(minutes=5))
             self._interface.storage.update({
@@ -373,8 +377,7 @@ class InputVerifyEmailCode(TextMarkup):
             interface,
             text_map=TextMap(
                 {
-                    "action": TextWidget(f'{Emoji.LOCK_AND_KEY} Enter verify code sent on your email'
-                                         f' {self._interface.storage["email"]}.')
+                    "action": TextWidget()
                 }
             ),
             markup_map=MarkupMap(
@@ -387,12 +390,17 @@ class InputVerifyEmailCode(TextMarkup):
             state=States.input_verify_email_code
         )
 
+    async def open(self, state, **kwargs):
+        self.text_map["action"].data = (f'{Emoji.LOCK_AND_KEY} Enter verify code sent on your email'
+                                        f' {self._interface.storage.get("email")}.')
+        await super().open(state)
+
     async def __call__(self, verify_code, state, session: ClientSession):
         if self._interface.storage['verify_code'] is None:
-            self._interface.feedback.data = f"Verify code expired"
+            await self._interface.update_feedback(f"Verify code expired")
             await self._interface.basic_manager.create_email.open(state)
         elif verify_code != self._interface.storage['verify_code']:
-            self._interface.feedback.data = f'{Emoji.DENIAL} Wrong verify code'
+            await self._interface.update_feedback(f'{Emoji.DENIAL} Wrong verify code')
             await self.open(state)
         else:
             self._interface.storage["verify_code"] = None
@@ -449,9 +457,9 @@ class ChangeNotificationsMinute(TextMarkup):
             MarkupMap(
                 [
                     {
-                        str(hour): ButtonWidget(
-                            callback_data=NotificationMinuteCallbackData(hour=hour)
-                        ) for hour in range(start, start + 10)
+                        str(minute): ButtonWidget(
+                            callback_data=NotificationMinuteCallbackData(minute=minute)
+                        ) for minute in range(start, start + 10)
                     }
                     for start in range(0, 60, 10)
                 ] + [
@@ -497,7 +505,7 @@ class AuthorizationWithPassword(TextMarkup):
                 self._interface.token = (await response.json())['token']
                 await self._interface.basic_manager.profile.open(state)
             elif response.status == 401:
-                self._interface.feedback.data = 'Wrong password'
+                await self._interface.update_feedback('Wrong password')
                 await self.open(state)
             else:
                 await self._interface.handling_unexpected_error(state)
@@ -505,7 +513,7 @@ class AuthorizationWithPassword(TextMarkup):
     async def reset_password(self, state: FSMContext, session: ClientSession):
         async with session.patch('/reset_password', json={'telegram_id': self._interface.chat_id}) as response:
             if response == 200:
-                self._interface.feedback.data = f'New password sent on your email {await response.text()}'
+                await self._interface.update_feedback(f'New password sent on your email {await response.text()}')
                 await self.open(state)
             else:
                 await self._interface.handling_unexpected_error(state)

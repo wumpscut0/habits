@@ -11,8 +11,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.redis import RedisJobStore
 
 from frontend.bot import bot
-from frontend.utils import config, Emoji
-
+from frontend.utils import config, Emoji, get_service_key
 
 remainder_text = Bold('Don`t forget mark done target today')
 remainder_markup = InlineKeyboardMarkup(
@@ -29,12 +28,11 @@ async def remainder(chat_id: int):
 
 
 async def increase_progress():
-    signature = jwt.encode({"password": os.getenv('SERVICES_PASSWORD')}, os.getenv('JWT'))
+    key = await get_service_key()
     async with aiohttp.ClientSession() as session:
-        await session.patch(os.getenv('BACKEND') + f'/increase_targets_progress/{signature}')
-        async with session.get(os.getenv('BACKEND') + f'/users_ids/{signature}') as response:
+        async with session.patch(os.getenv('BACKEND') + f'/increase_targets_progress/{key}') as response:
             for user_id in (await response.json()):
-                scheduler.add_job(remainder,  replace_existing=True, id=user_id)
+                scheduler.add_job(remainder,  args=(user_id,), replace_existing=True, id=user_id)
 
 
 async def reset_verify_code(interface):
