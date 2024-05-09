@@ -46,8 +46,8 @@ async def open_profile(callback: CallbackQuery, interface: Interface, state: FSM
 
 
 @basic_router.callback_query(F.data == "options")
-async def open_options(callback: CallbackQuery, interface: Interface, state: FSMContext):
-    await interface.basic_manager.options.open(state)
+async def open_options(callback: CallbackQuery, interface: Interface, state: FSMContext, session: ClientSession):
+    await interface.basic_manager.options.open(state, session=session)
     
 
 ########################################################################################################################
@@ -73,6 +73,14 @@ async def input_password(message: Message, interface: Interface, state: FSMConte
 async def repeat_password(message: Message, interface: Interface, state: FSMContext):
     await interface.basic_manager.repeat_password(message.text, state)
     await message.delete()
+
+
+########################################################################################################################
+
+
+@basic_router.callback_query(F.data == 'create_email')
+async def open_create_email(callback: CallbackQuery, interface: Interface, state: FSMContext, session: ClientSession):
+    await interface.basic_manager.input_email.open(state)
 
 
 @basic_router.message(StateFilter(States.input_email), F.text)

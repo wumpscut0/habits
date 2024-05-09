@@ -1,8 +1,9 @@
 import os
 from typing import Annotated
-from datetime import time
+from datetime import time, UTC
 from fastapi import Header, Request, FastAPI, HTTPException
 from passlib.handlers.pbkdf2 import pbkdf2_sha256
+from starlette.responses import PlainTextResponse
 
 from backend.database import Session
 from backend.routers.models import AuthApiModel, TelegramIdApiModel, UpdatePasswordApiModel, TargetApiModel, NotificationTimeApiModel
@@ -20,10 +21,10 @@ async def registration(telegram_id_api_model: TelegramIdApiModel):
         await AuthQueries.registration(session, **telegram_id_api_model.model_dump())
 
 
-@app.post("/sign_in")
+@app.post("/sign_in", response_class=PlainTextResponse)
 async def authorization(auth_api_model: AuthApiModel):
     async with Session.begin() as session:
-        await AuthQueries.authorisation(session, **auth_api_model.model_dump())
+        return await AuthQueries.authorisation(session, **auth_api_model.model_dump())
 
 
 @app.patch('/update_password')
@@ -62,14 +63,14 @@ async def invert_notification(user_id: str):
         return await CommonQueries.invert_user_notifications(session, data["telegram_id"])
 
 
-@app.get("/notification_time")
-async def get_notification_time(Authorization: Annotated[str, Header()]):
+@app.get("/notification_time/{user_id}")
+async def get_notification_time(user_id: str):
+    data = await decode_jwt(user_id)
     async with Session.begin() as session:
-        telegram_id = await AuthQueries.authentication(session, Authorization)
-        time = await CommonQueries.user_notification_time(session, telegram_id)
+        time_ = await CommonQueries.user_notification_time(session, data["telegram_id"])
         return {
-            "hour": time.hour,
-            "minute": time.minute
+            "hour": time_.hour,
+            "minute": time_.minute
         }
 
 
@@ -86,7 +87,12 @@ async def notification_is_on(user_id: str):
 async def change_notification_time(time_: NotificationTimeApiModel, Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
         telegram_id = await AuthQueries.authentication(session, Authorization)
-        return await CommonQueries.change_notification_time(session, telegram_id, time(**time_.model_dump()))
+        await CommonQueries.update_notification_time(session, telegram_id, time(**time_.model_dump(), tzinfo=UTC))
+        time_ = await CommonQueries.user_notification_time(session, telegram_id)
+        return {
+            "hour": time_.hour,
+            "minute": time_.minute
+        }
 
 
 @app.get('/show_up_targets')
@@ -166,14 +172,7 @@ async def invert_target_completed(target_id: int, Authorization: Annotated[str, 
 async def notification_is_on(user_id: str):
     data = await decode_jwt(user_id)
     async with Session.begin() as session:
-        result = await TargetsQueries.is_all_done(session, data["telegram_id"])
-        if result:
-            return result
-        else:
-            return {
-                "hour": result.hour,
-                "minute": result.minute
-            }
+        return await TargetsQueries.is_all_done(session, data["telegram_id"])
 
 
 @app.patch('/increase_targets_progress/{key}')

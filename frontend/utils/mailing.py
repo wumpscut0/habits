@@ -20,12 +20,17 @@ class Mailing:
 
     @classmethod
     async def verify_email(cls, receiver):
-        verify_code = cls._generate_secret_key()
+        verify_code = await cls._generate_secret_key()
         message = MIMEText(f'Your verify code: {verify_code}')
         message['To'] = receiver
         message['From'] = MAIL_ADDRESS
         message['Subject'] = 'Verify email'
-        async with aiosmtplib.SMTP(hostname=SMTP_SERVER, username=MAIL_ADDRESS, port=PORT, password=SMTP_PASSWORD,
-                                   start_tls=True) as session:
-            await session.sendmail(MAIL_ADDRESS, receiver, message.as_string())
-        return verify_code
+        async with aiosmtplib.SMTP(
+                hostname=SMTP_SERVER,
+                username=MAIL_ADDRESS,
+                port=PORT,
+                password=SMTP_PASSWORD,
+                use_tls=True
+        ) as connect:
+            await connect.sendmail(MAIL_ADDRESS, receiver, message.as_string())
+            return verify_code

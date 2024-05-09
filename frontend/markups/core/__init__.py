@@ -3,7 +3,7 @@ from typing import List, Dict, Any
 from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.state import State
 from aiogram.utils.formatting import as_list, Text, Bold, Italic
-from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from frontend.utils import Emoji
 
@@ -46,8 +46,8 @@ class TextWidget(Hideable, Resettable):
     def text(self):
         if self._text is None:
             return Text(Emoji.BAN)
-        if self.active:
-            return Bold(self._text)
+
+        return Bold(self._text)
 
     @text.setter
     def text(self, value):
@@ -80,9 +80,10 @@ class DataTextWidget(Hideable, Resettable):
     def text(self):
         if self.header is None:
             return Text(Emoji.BAN)
-        if self.active:
-            separator = '' if str(self.header).startswith(' ') else ' '
-            return Text(self.mark) + Text(separator) + Bold(self.header) + Text(self.sep) + Italic(self.data) + Italic(self.end)
+
+        separator = '' if str(self.header).startswith(' ') else ' '
+        return Text(self.mark) + Text(separator) + Bold(self.header) + Text(self.sep) + Italic(self.data) + Italic(
+            self.end)
 
 
 class ButtonWidget(Hideable, Resettable):
@@ -95,18 +96,32 @@ class ButtonWidget(Hideable, Resettable):
             active=True
     ):
         super().__init__(active)
-        self.text = text
-        self.callback_data = callback_data
+        self._text = text
+        self._callback_data = callback_data
         self.mark = mark
         super(Hideable, self).__init__(self)
 
     @property
-    def button(self):
-        if not self.text or not self.callback_data:
-            return InlineKeyboardButton(text=Emoji.BAN, callback_data='None')
-        if self.active:
-            separator = '' if self.text.startswith(' ') else ' '
-            return InlineKeyboardButton(text=self.mark + separator + self.text, callback_data=self.callback_data)
+    def text(self):
+        if not self._text:
+            return Emoji.BAN
+
+        separator = '' if self._text.startswith(' ') else ' '
+        return self.mark + separator + self._text
+
+    @text.setter
+    def text(self, text):
+        self._text = text
+
+    @property
+    def callback_data(self):
+        if not self._callback_data:
+            return Emoji.BAN
+        return self._callback_data
+
+    @callback_data.setter
+    def callback_data(self, callback_data):
+        self._callback_data = callback_data
 
 
 # class PhotoMarkup:
@@ -128,7 +143,7 @@ class TextMap:
 
     @property
     async def text(self):
-        return (as_list(*[row.text for row in self._map.values() if row.text is not None])).as_html()
+        return (as_list(*[text.text for text in self._map.values() if text.active])).as_html()
 
     def __getitem__(self, name):
         return self._map[name]
@@ -149,9 +164,14 @@ class MarkupMap:
 
     @property
     async def markup(self):
-        return InlineKeyboardBuilder(
-            [[button.button for button in row.values() if button.button is not None] for row in self._map]
-        ).as_markup()
+        markup = InlineKeyboardBuilder()
+        for row in self._map:
+            markup_part = InlineKeyboardBuilder()
+            for button in row.values():
+                if button.active:
+                    markup_part.button(text=button.text, callback_data=button.callback_data)
+            markup.attach(markup_part)
+        return markup.as_markup()
 
     def __getitem__(self, name):
         return self._adapt_map[name]

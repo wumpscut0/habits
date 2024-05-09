@@ -51,16 +51,15 @@ class CommonQueries:
 
     @staticmethod
     async def user_notification_time(session: AsyncSession, telegram_id: int):
-        return (
-            await session.execute(select(UserORM.notification_time).where(UserORM.telegram_id == telegram_id))).scalar()
+        return (await session.execute(select(UserORM.notification_time).where(UserORM.telegram_id == telegram_id))).scalar()
 
     @staticmethod
     async def notification_is_on(session: AsyncSession, telegram_id: int):
         return (await session.execute(select(UserORM.notifications).where(UserORM.telegram_id == telegram_id))).scalar()
 
     @staticmethod
-    async def change_notification_time(session: AsyncSession, telegram_id: int, time):
-        await session.execute(update(UserORM.notification_time).values({"notification_time": time}).where(
+    async def update_notification_time(session: AsyncSession, telegram_id: int, time):
+        await session.execute(update(UserORM).values({"notification_time": time}).where(
             UserORM.telegram_id == telegram_id))
 
     @staticmethod
@@ -177,9 +176,10 @@ class TargetsQueries:
 
     @staticmethod
     async def is_all_done(session: AsyncSession, telegram_id: int):
-        return 1 if all((await session.execute(select(TargetORM.completed).where(UserORM.telegram_id == telegram_id)))
-                          .scalars()) else (
-            await session.execute(select(UserORM.notification_time).where(UserORM.telegram_id == telegram_id))).scalar()
+        statuses = (await session.execute(select(TargetORM.completed).where(TargetORM.user_id == telegram_id))).scalars()
+        if statuses and not all(statuses):
+            return 0
+        return 1
 
     @staticmethod
     async def increase_progress(session: AsyncSession):

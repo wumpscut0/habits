@@ -22,15 +22,15 @@ class CommonMiddleware(BaseMiddleware):
 
         if interface is not None:
             interface = await deserialize(interface)
-
             session_context = ClientSession(
                 os.getenv('BACKEND'),
-                headers={"Authentication": interface.token if interface.token is not None else "None"}
+
+                headers={"Authorization": interface.token if interface.token is not None else "None"}
             )
         else:
             session_context = ClientSession(
                 os.getenv('BACKEND'),
-                headers={"Authentication": "None"}
+                headers={"Authorization": "None"}
             )
 
         async with session_context as session:

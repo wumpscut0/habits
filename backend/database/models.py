@@ -40,7 +40,7 @@ class TargetORM(Base):
     progress = Column(Integer, default=0)
     border_progress = Column(Integer, default=21)
 
-    user_id = Column(Integer, ForeignKey('user.telegram_id'), nullable=False)
+    user_id = Column(BIGINT, ForeignKey('user.telegram_id'), nullable=False)
 
     def as_dict_(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.c.columns}

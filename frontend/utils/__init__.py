@@ -5,6 +5,9 @@ from configparser import ConfigParser
 from typing import Dict
 
 import jwt
+from redis import Redis
+
+storage = Redis(db=2)
 
 
 class Emoji:

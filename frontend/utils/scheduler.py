@@ -12,6 +12,7 @@ from apscheduler.jobstores.redis import RedisJobStore
 
 from frontend.bot import bot
 from frontend.utils import config, Emoji, get_service_key
+from frontend.utils.loggers import info
 
 remainder_text = Bold('Don`t forget mark done target today')
 remainder_markup = InlineKeyboardMarkup(
@@ -37,6 +38,8 @@ async def increase_progress():
 
 async def reset_verify_code(interface):
     interface.storage.update({"verify_code": None, "email": None})
+    r
+    info.info('Reset verify email code completed')
 
 
 DEFAULT_REMAINING_HOUR = config.getint('limitations', "DEFAULT_REMAINING_HOUR")

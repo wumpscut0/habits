@@ -6,7 +6,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from frontend.bot.FSM import States
 from frontend.markups.core import *
-from frontend.utils import config, Emoji, encode_jwt
+from frontend.utils import config, Emoji
 from frontend.utils.scheduler import scheduler, remainder
 
 MAX_EMAIL_LENGTH = config.getint('limitations', 'MAX_EMAIL_LENGTH')

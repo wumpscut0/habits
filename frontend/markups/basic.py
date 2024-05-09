@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 
 from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
@@ -71,9 +71,10 @@ class TitleScreen(TextMarkup):
             if response.status == 400:
                 await self._interface.basic_manager.authorization_with_password.open(state)
             elif response.status == 200:
+                self._interface.token = await response.text()
                 await self._interface.basic_manager.profile.open(state)
             else:
-                await self._interface.handling_unexpected_error(state)
+                await self._interface.handling_unexpected_error(state, response)
 
     async def invert_notifications(self, session: ClientSession, state: FSMContext):
         token = await encode_jwt({"telegram_id": self._interface.chat_id})
@@ -81,12 +82,12 @@ class TitleScreen(TextMarkup):
             content = await response.text()
         if content == '1':
             self.markup_map["notifications"].mark = Emoji.BELL
-            async with session.get(f"/is_all_done/{self._interface.user_encode_id}") as response_:
-                if await response_.text() != "1":
-                    scheduler.add_job(self._interface.chat_id)
+            async with session.get(f"/is_all_done/{await self._interface.user_encode_id()}") as response_:
+                if await response_.text() == "0":
+                    await self._interface.notification_on(session)
             await self.open(state)
         elif content == '0':
-            scheduler.remove_job(self._interface.chat_id)
+            await self._interface.notification_off()
             self.markup_map["notifications"].mark = Emoji.NOT_BELL
             await self.open(state)
         else:
@@ -148,15 +149,23 @@ class Options(TextMarkup):
                             text=f"{Emoji.BELL + Emoji.CLOCK} Change notification time",
                             callback_data="change_notification_time"
                         )
+                    },
+                    {
+                        "back": ButtonWidget(
+                            text=f"{Emoji.BACK} Back",
+                            callback_data="profile"
+                        )
                     }
                 ]
             )
         )
 
     async def open(self, state, **kwargs):
-        async with kwargs['session'].get(f'/notification_time') as response:
+        async with kwargs['session'].get(f'/notification_time/{await self._interface.user_encode_id()}') as response:
             time_ = await response.json()
-            self.text_map["notification_time"].data = f"{time_['hour']}:{time_['minute']}"
+            minute = str(time_['minute'])
+            minute = "0" + minute if len(minute) < 2 else minute
+            self.text_map["notification_time"].data = f"{time_['hour']}:{minute}"
 
         if self.markup_map["delete_password"].active:
             self.markup_map['update_password'].text = f'{Emoji.KEY}{Emoji.UP} Update password'
@@ -184,7 +193,7 @@ class Options(TextMarkup):
             elif response.status == 401:
                 await self._interface.close_session(state)
             else:
-                await self._interface.handling_unexpected_error(state)
+                await self._interface.handling_unexpected_error(state, response)
 
     async def delete_password(self, state: FSMContext, session: ClientSession):
         async with session.delete("delete_password") as response:
@@ -204,12 +213,13 @@ class Options(TextMarkup):
         async with session.patch('/notification_time', json={"hour": hour, "minute": minute}) as response:
             if response.status == 200:
                 self.text_map["notification_time"].data = f"{hour}:{minute}"
-                scheduler.modify_job(self._interface.chat_id, trigger=CronTrigger(hour=hour, minute=minute))
-                await self.open(state)
+                await self._interface.update_notification_time()
+                await self.open(state, session=session)
             elif response.status == 401:
                 await self._interface.close_session(state)
             else:
-                await self._interface.handling_unexpected_error(state)
+                await self._interface.handling_unexpected_error(state, response)
+
         self._interface.storage.update({"hour": None, "minute": None})
 
 
@@ -225,7 +235,7 @@ class CreatePassword(TextMarkup):
             markup_map=MarkupMap(
                 [
                     {
-                        "back": ButtonWidget(text=f"{Emoji.DENIAL} Cancel", callback_data='profile')
+                        "back": ButtonWidget(text=f"{Emoji.DENIAL} Cancel", callback_data='options')
                     }
                 ]
             ),
@@ -253,7 +263,7 @@ class RepeatPassword(TextMarkup):
             markup_map=MarkupMap(
                 [
                     {
-                        "back": ButtonWidget(text=f"{Emoji.DENIAL} Cancel", callback_data='profile')
+                        "back": ButtonWidget(text=f"{Emoji.DENIAL} Cancel", callback_data='options')
                     }
                 ]
             ),
@@ -323,15 +333,18 @@ class PasswordResume(TextMarkup):
 
         suggestions = password_grade['feedback']['suggestions']
         if suggestions:
-            suggestions = '\n'
+            suggestions_ = '\n'
             for n, suggestion in enumerate(suggestions, start=1):
-                suggestions += f'{n}) {suggestion}'
-            self.text_map['suggestions'].data = suggestions
+                suggestions_ += f'{n}) {suggestion}'
+            self.text_map['suggestions'].data = suggestions_
             self.text_map['suggestions'].on()
 
         await super().open(state)
+        await self.text_map['warning'].reset()
         self.text_map['warning'].off()
+        await self.text_map['suggestions'].reset()
         self.text_map['suggestions'].off()
+        await self._interface.update_interface_in_redis(state)
 
 
 class CreateEmail(TextMarkup):
@@ -346,7 +359,7 @@ class CreateEmail(TextMarkup):
             markup_map=MarkupMap(
                 [
                     {
-                        "back": ButtonWidget(text=f'{Emoji.BACK} Back to profile', callback_data="profile")
+                        "back": ButtonWidget(text=f'{Emoji.DENIAL} Cancel', callback_data="options")
                     }
                 ]
             ),
@@ -363,7 +376,7 @@ class CreateEmail(TextMarkup):
         else:
             await self._interface.update_feedback(f'Verify code sended on your email {email}')
             scheduler.add_job(reset_verify_code, "date", (self._interface,),
-                              run_date=datetime.now() + timedelta(minutes=5))
+                              run_date=datetime.now(tz=UTC) + timedelta(minutes=5))
             self._interface.storage.update({
                 "verify_code": await Mailing.verify_email(email),
                 "email": email
@@ -383,7 +396,7 @@ class InputVerifyEmailCode(TextMarkup):
             markup_map=MarkupMap(
                 [
                     {
-                        "back": ButtonWidget(text=f'{Emoji.BACK} Change email', callback_data="input_email")
+                        "back": ButtonWidget(text=f'{Emoji.BACK} Change email', callback_data="create_email")
                     }
                 ]
             ),
@@ -391,7 +404,7 @@ class InputVerifyEmailCode(TextMarkup):
         )
 
     async def open(self, state, **kwargs):
-        self.text_map["action"].data = (f'{Emoji.LOCK_AND_KEY} Enter verify code sent on your email'
+        self.text_map["action"].text = (f'{Emoji.LOCK_AND_KEY} Enter verify code sent on your email'
                                         f' {self._interface.storage.get("email")}.')
         await super().open(state)
 
@@ -404,7 +417,7 @@ class InputVerifyEmailCode(TextMarkup):
             await self.open(state)
         else:
             self._interface.storage["verify_code"] = None
-            await self._interface.basic_manager.update_password(session, state)
+            await self._interface.basic_manager.options.update_password(session, state)
 
 
 class NotificationHourCallbackData(CallbackData, prefix="notification_hour"):
@@ -424,6 +437,7 @@ class ChangeNotificationsHour(TextMarkup):
                 [
                     {
                         str(hour): ButtonWidget(
+                            text=str(hour),
                             callback_data=NotificationHourCallbackData(hour=hour)
                         ) for hour in range(start, start + 8)
                     }
@@ -436,9 +450,9 @@ class ChangeNotificationsHour(TextMarkup):
             )
         )
 
-    def __call__(self, hour: int, state):
+    async def __call__(self, hour: int, state):
         self._interface.storage["hour"] = hour
-        self._interface.basic_manager.change_notification_minute.open(state)
+        await self._interface.basic_manager.change_notification_minute.open(state)
 
 
 class NotificationMinuteCallbackData(CallbackData, prefix="notification_minute"):
@@ -458,10 +472,18 @@ class ChangeNotificationsMinute(TextMarkup):
                 [
                     {
                         str(minute): ButtonWidget(
+                            text=str(minute),
                             callback_data=NotificationMinuteCallbackData(minute=minute)
-                        ) for minute in range(start, start + 10)
+                        ) for minute in range(start, start + 8)
                     }
-                    for start in range(0, 60, 10)
+                    for start in range(0, 56, 8)
+                ] + [
+                    {
+                        str(minute): ButtonWidget(
+                            text=str(minute),
+                            callback_data=NotificationMinuteCallbackData(minute=minute)
+                        ) for minute in range(56, 60)
+                    }
                 ] + [
                     {
                         "back": ButtonWidget(text=f"{Emoji.BACK} Cancel", callback_data='options')
@@ -472,7 +494,7 @@ class ChangeNotificationsMinute(TextMarkup):
 
     async def __call__(self, minute: int, state: FSMContext, session: ClientSession):
         self._interface.storage["minute"] = minute
-        self._interface.basic_manager.options.update_notifications_time(session, state)
+        await self._interface.basic_manager.options.update_notifications_time(session, state)
 
 
 class AuthorizationWithPassword(TextMarkup):
@@ -502,7 +524,7 @@ class AuthorizationWithPassword(TextMarkup):
             'telegram_id': self._interface.chat_id, "password": password
         }) as response:
             if response.status == 200:
-                self._interface.token = (await response.json())['token']
+                self._interface.token = await response.text()
                 await self._interface.basic_manager.profile.open(state)
             elif response.status == 401:
                 await self._interface.update_feedback('Wrong password')
