@@ -99,7 +99,7 @@ class TargetsControl(TextMarkup):
         target_id = self._interface.targets_manager.current_target_id
         async with session.delete(f'/delete_target/{target_id}') as response:
             if response.status == 200:
-                async with session.get(f"/is_all_done/{self._interface.user_encode_id}") as response_:
+                async with session.get(f"/is_all_done/{self._interface.encoded_chat_id}") as response_:
                     if await response_.text() == "1":
                         scheduler.remove_job(job_id=self._interface.chat_id)
 

@@ -4,6 +4,7 @@ from string import digits
 from email.mime.text import MIMEText
 
 import aiosmtplib
+from aiosmtplib import SMTPException
 
 from frontend.utils import config
 
@@ -32,5 +33,9 @@ class Mailing:
                 password=SMTP_PASSWORD,
                 use_tls=True
         ) as connect:
-            await connect.sendmail(MAIL_ADDRESS, receiver, message.as_string())
+            try:
+                await connect.sendmail(MAIL_ADDRESS, receiver, message.as_string())
+            except SMTPException:
+                return
+
             return verify_code

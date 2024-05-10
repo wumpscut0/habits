@@ -40,7 +40,7 @@ class TextWidget(Hideable, Resettable):
         super(Hideable, self).__init__(self)
 
     def __repr__(self):
-        return self.text
+        return self._text
 
     @property
     def text(self):

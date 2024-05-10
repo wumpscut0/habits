@@ -1,3 +1,5 @@
+from typing import Literal
+
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiohttp import ClientSession, ContentTypeError
@@ -16,6 +18,12 @@ from frontend.utils.scheduler import scheduler, remainder
 
 
 class Interface(SerializableMixin):
+    _feedback_headers = {
+        "default": f'{Emoji.REPORT} Feedback',
+        "info": f"{Emoji.INFO} Info",
+        "error": f"{Emoji.DENIAL} Error"
+    }
+
     def __init__(self, chat_id: int, first_name: str):
         self.basic_manager = BasicManager(self)
         self.targets_manager = TargetsManager(self)
@@ -23,7 +31,7 @@ class Interface(SerializableMixin):
         self.first_name = first_name
         self.chat_id = chat_id
         self.token = None
-        self.feedback = DataTextWidget(header=f'{Emoji.REPORT} Feedback', active=False)
+        self.feedback = DataTextWidget(active=False)
 
         self._message_id = None
         self._current_markup = None
@@ -88,8 +96,9 @@ class Interface(SerializableMixin):
         await self.clean_trash()
         await self.update_interface_in_redis(state)
 
-    async def update_feedback(self, feedback: str, active=True):
-        self.feedback.data = feedback
+    async def update_feedback(self, msg: str, type_: Literal["default", "info", "error"] = "default", active=True):
+        self.feedback.header = self._feedback_headers[type_]
+        self.feedback.data = msg
         if active:
             self.feedback.on()
 
@@ -119,11 +128,11 @@ class Interface(SerializableMixin):
         except ContentTypeError:
             errors.error("internal server error")
 
-    async def user_encode_id(self):
+    async def encoded_chat_id(self):
         return await encode_jwt({'telegram_id': self.chat_id})
 
     async def notification_on(self, session: ClientSession):
-        async with session.get(f'/notification_time/{await self.user_encode_id()}') as response:
+        async with session.get(f'/notification_time/{await self.encoded_chat_id()}') as response:
             if response.status == 200:
                 time_ = await response.json()
                 scheduler.add_job(
@@ -137,7 +146,7 @@ class Interface(SerializableMixin):
             scheduler.remove_job(job_id=self.chat_id, jobstore='default')
         except JobLookupError:
             pass
-            # info.warning(f'With try delete job, it was not found for user: {self.chat_id}')
+            # info.warning(f'With try to delete job, it was not found for user: {self.chat_id}')
 
     async def update_notification_time(self):
         hour = storage.get("hour")
@@ -149,6 +158,12 @@ class Interface(SerializableMixin):
 
     async def update_interface_in_redis(self, state):
         await state.update_data({'interface': await self.serialize()})
+
+    async def temp_message(self, msg="Processing..."):
+        try:
+            await bot.edit_message_text(text=msg, chat_id=self.chat_id, message_id=self._message_id)
+        except TelegramBadRequest:
+            pass
 
     async def _reset_state(self, state: FSMContext):
         await state.set_state(None)

@@ -27,13 +27,25 @@ async def authorization(auth_api_model: AuthApiModel):
         return await AuthQueries.authorisation(session, **auth_api_model.model_dump())
 
 
+########################################################################################################################
+
+
+@app.get('/is_password_set/{user_id}', response_class=PlainTextResponse)
+async def is_password_set(user_id: str):
+    data = await decode_jwt(user_id)
+    async with Session.begin() as session:
+        if await CommonQueries.is_password_set(session, data["telegram_id"]) is not None:
+            return "1"
+        return "0"
+
+
 @app.patch('/update_password')
 async def update_password_(update_password_api_model: UpdatePasswordApiModel, Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
         telegram_id = await AuthQueries.authentication(session, Authorization)
         await CommonQueries.update_password(session, telegram_id, update_password_api_model.hash)
-        if update_password_api_model.email is not None:
-            await CommonQueries.update_email(session, telegram_id, update_password_api_model.email)
+if update_password_api_model.email is not None:
+    await CommonQueries.update_email(session, telegram_id, update_password_api_model.email)
 
 
 @app.patch("/reset_password")
@@ -197,4 +209,4 @@ async def error_abyss(request: Request, call_next):
         return await call_next(request)
     except Exception as e:
         errors.error(e)
-        raise HTTPException(500)
+        raise HTTPException(500, e)

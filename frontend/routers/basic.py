@@ -53,8 +53,8 @@ async def open_options(callback: CallbackQuery, interface: Interface, state: FSM
 ########################################################################################################################
 
 
-@basic_router.callback_query(F.data == "update_password")
-async def open_update_password(callback: CallbackQuery, interface: Interface, state: FSMContext):
+@basic_router.callback_query(F.data == "input_password")
+async def open_input_password(callback: CallbackQuery, interface: Interface, state: FSMContext):
     await interface.basic_manager.input_password.open(state)
 
 
@@ -70,8 +70,8 @@ async def input_password(message: Message, interface: Interface, state: FSMConte
 
 
 @basic_router.message(StateFilter(States.repeat_password), F.text)
-async def repeat_password(message: Message, interface: Interface, state: FSMContext):
-    await interface.basic_manager.repeat_password(message.text, state)
+async def repeat_password(message: Message, interface: Interface, state: FSMContext, session: ClientSession):
+    await interface.basic_manager.repeat_password(message.text, state, session)
     await message.delete()
 
 

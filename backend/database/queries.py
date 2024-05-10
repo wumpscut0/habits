@@ -46,6 +46,11 @@ class AuthQueries:
 
 class CommonQueries:
     @staticmethod
+    async def is_password_set(session: AsyncSession, telegram_id: int):
+        return (await session.execute(select(UserORM.hash)
+                                      .where(UserORM.telegram_id == telegram_id))).scalar_one_or_none()
+
+    @staticmethod
     async def users_ids(session: AsyncSession):
         return (await session.execute(select(UserORM.telegram_id).where(UserORM.notifications))).scalars()
 
@@ -77,6 +82,7 @@ class CommonQueries:
 
     @staticmethod
     async def update_password(session: AsyncSession, telegram_id: int, hash_: str):
+        print(isinstance(telegram_id, int))
         await session.execute(update(UserORM).where(UserORM.telegram_id == telegram_id).values({"password": hash_}))
 
     @staticmethod
