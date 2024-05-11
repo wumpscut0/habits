@@ -1,8 +1,6 @@
 import re
 
 from aiogram.filters.callback_data import CallbackData
-from aiogram.fsm.context import FSMContext
-from aiohttp import ClientSession
 from passlib.handlers.pbkdf2 import pbkdf2_sha256
 from zxcvbn import zxcvbn
 
@@ -31,11 +29,12 @@ class BasicManager:
 
         self.profile = Profile(interface)
         self.options = Options(interface)
-        self.input_password = CreatePassword(interface)
+        self.input_password = InputPassword(interface)
         self.repeat_password = RepeatPassword(interface)
         self.resume_password = PasswordResume(interface)
-        self.input_email = CreateEmail(interface)
+        self.input_email = InputEmail(interface)
         self.input_verify_email_code = InputVerifyEmailCode(interface)
+        self.input_verify_code_reset_password = InputVerifyCodeResetPassword(interface)
         self.change_notification_hour = ChangeNotificationsHour(interface)
         self.change_notification_minute = ChangeNotificationsMinute(interface)
 
@@ -65,32 +64,32 @@ class TitleScreen(TextMarkup):
             )
         )
 
-    async def authorization(self, session: ClientSession, state: FSMContext):
-        async with session.post('/sign_in', json={'telegram_id': self._interface.chat_id}) as response:
-            if response.status == 400:
-                await self._interface.basic_manager.authorization_with_password.open(state)
+    async def authorization(self):
+        async with self._interface.session.post('/sign_in', json={'telegram_id': self._interface.chat_id}) as response:
+            if response.status == 401:
+                await self._interface.basic_manager.authorization_with_password.open()
             elif response.status == 200:
                 self._interface.token = await response.text()
-                await self._interface.basic_manager.profile.open(state)
+                await self._interface.basic_manager.profile.open()
             else:
-                await self._interface.handling_unexpected_error(state, response)
+                await self._interface.handling_unexpected_error(response)
 
-    async def invert_notifications(self, session: ClientSession, state: FSMContext):
+    async def invert_notifications(self):
         token = await encode_jwt({"telegram_id": self._interface.chat_id})
-        async with session.patch(f'/invert_notifications/{token}') as response:
+        async with self._interface.session.patch(f'/invert_notifications/{token}') as response:
             content = await response.text()
         if content == '1':
             self.markup_map["notifications"].mark = Emoji.BELL
-            async with session.get(f"/is_all_done/{await self._interface.encoded_chat_id()}") as response_:
+            async with self._interface.session.get(f"/is_all_done/{await self._interface.encoded_chat_id()}") as response_:
                 if await response_.text() == "0":
-                    await self._interface.notification_on(session)
-            await self.open(state)
+                    await self._interface.notification_on()
+            await self.open()
         elif content == '0':
             await self._interface.notification_off()
             self.markup_map["notifications"].mark = Emoji.NOT_BELL
-            await self.open(state)
+            await self.open()
         else:
-            await self._interface.handling_unexpected_error(state, response)
+            await self._interface.handling_unexpected_error(response)
 
 
 class Profile(TextMarkup):
@@ -117,9 +116,9 @@ class Profile(TextMarkup):
             )
         )
 
-    async def open(self, state, **kwargs):
+    async def open(self):
         self.text_map['hello'].data = self._interface.first_name
-        await super().open(state)
+        await super().open()
 
 
 class Options(TextMarkup):
@@ -144,6 +143,16 @@ class Options(TextMarkup):
                         ),
                     },
                     {
+                        "input_email": ButtonWidget(
+                            callback_data='input_email',
+                        ),
+                        "delete_email": ButtonWidget(
+                            text=f"{Emoji.ENVELOPE + Emoji.DENIAL} Remove email",
+                            callback_data="delete_email",
+                            active=False
+                        )
+                    },
+                    {
                         "notifications": ButtonWidget(
                             text=f"{Emoji.BELL + Emoji.CLOCK} Change notification time",
                             callback_data="change_notification_time"
@@ -159,80 +168,111 @@ class Options(TextMarkup):
             )
         )
 
-    async def open(self, state, **kwargs):
-        async with kwargs['session'].get(f'/notification_time/{await self._interface.encoded_chat_id()}') as response:
+    async def open(self):
+        async with self._interface.session.get(f'/notification_time/{await self._interface.encoded_chat_id()}') as response:
             if response.status == 200:
                 time_ = await response.json()
                 minute = str(time_['minute'])
                 minute = "0" + minute if len(minute) < 2 else minute
                 self.text_map["notification_time"].data = f"{time_['hour']}:{minute}"
             else:
-                await self._interface.handling_unexpected_error(state, response)
+                await self._interface.handling_unexpected_error(response)
                 return
 
-        async with kwargs["session"].get(f"/is_password_set/{await self._interface.encoded_chat_id()}") as response:
+        async with self._interface.session.get(f"/is_password_set/{await self._interface.encoded_chat_id()}") as response:
             if response.status == 200:
                 response = await response.text()
                 if response == '1':
-                    self.markup_map['input_password'].text = f'{Emoji.KEY}{Emoji.UP} Update password'
+                    self.markup_map['delete_password'].on()
+                    self.markup_map['input_password'].text = f'{Emoji.KEY + Emoji.UP} Change password'
                 else:
-                    self.markup_map["input_password"].text = f"{Emoji.KEY}{Emoji.PLUS} Add password"
+                    self.markup_map['delete_password'].off()
+                    self.markup_map["input_password"].text = f"{Emoji.KEY + Emoji.PLUS} Add password"
             else:
-                await self._interface.handling_unexpected_error(state, response)
+                await self._interface.handling_unexpected_error(response)
                 return
 
-        await super().open(state)
-
-    async def update_password(self, session: ClientSession, state: FSMContext):
-        async with (session.patch('/update_password', json={
-            "hash": storage.get(f"hash:{self._interface.chat_id}"),
-            "email": storage.get(f"email:{self._interface.chat_id}")
-        }) as response):
-            storage.delete(f"hash:{self._interface.chat_id}", f"email:{self._interface.chat_id}")
-
+        async with self._interface.session.get(f"/is_email_set/{await self._interface.encoded_chat_id()}") as response:
             if response.status == 200:
-                if self._interface.basic_manager.options.markup_map['delete_password'].active:
-                    feedback = f'Password updated'
+                response = await response.text()
+                if response == '1':
+                    self.markup_map['delete_email'].on()
+                    self.markup_map['input_email'].text = f'{Emoji.ENVELOPE + Emoji.UP} Change email'
                 else:
-                    feedback = f'Password and email updated'
-                await self._interface.update_feedback(feedback, type_="info")
-
-                self._interface.basic_manager.options.markup_map['delete_password'].on()
-                await self._interface.basic_manager.profile.open(state)
-            elif response.status == 401:
-                await self._interface.close_session(state)
+                    self.markup_map['delete_email'].off()
+                    self.markup_map["input_email"].text = f"{Emoji.ENVELOPE + Emoji.PLUS} Add email"
             else:
-                await self._interface.handling_unexpected_error(state, response)
+                await self._interface.handling_unexpected_error(response)
+                return
 
-    async def delete_password(self, state: FSMContext, session: ClientSession):
-        async with session.delete("delete_password") as response:
+        await super().open()
+
+    async def update_password(self):
+        payload = {
+            "telegram_id": self._interface.chat_id,
+            "hash": storage.get(f"hash:{self._interface.chat_id}"),
+        }
+        async with (self._interface.session.patch(f"/update_password/{await encode_jwt(payload)}") as response):
+            if response.status == 200:
+                await self._interface.update_feedback(f'Password updated', type_="info")
+                await self._interface.basic_manager.title_screen.open()
+            elif response.status == 401:
+                await self._interface.close_session()
+            else:
+                await self._interface.handling_unexpected_error(response)
+
+    async def delete_password(self):
+        async with self._interface.session.delete("/delete_password") as response:
             if response.status == 200:
                 self.markup_map["delete_password"].off()
                 await self._interface.update_feedback("password deleted")
-                await self.open(state)
+                await self.open()
             elif response.status == 401:
-                await self._interface.close_session(state)
+                await self._interface.close_session()
             else:
-                await self._interface.handling_unexpected_error(state, response)
+                await self._interface.handling_unexpected_error(response)
 
-    async def update_notifications_time(self, session: ClientSession, state: FSMContext):
-        hour = storage.get(f"hour:{self._interface.chat_id}")()
-        minute = storage.get(f"minute:{self._interface.chat_id}")()
+    async def update_email(self):
+        async with (self._interface.session.patch('/update_email', json={
+            "email": storage.get(f"email:{self._interface.chat_id}"),
+        }) as response):
+            if response.status == 200:
+                await self._interface.update_feedback(f'Email updated', type_="info")
+                await self.open()
+            elif response.status == 401:
+                await self._interface.close_session()
+            else:
+                await self._interface.handling_unexpected_error(response)
 
-        async with session.patch('/notification_time', json={"hour": hour, "minute": minute}) as response:
+    async def delete_email(self):
+        async with self._interface.session.delete("/delete_email") as response:
+            if response.status == 200:
+                self.markup_map["delete_email"].off()
+                await self._interface.update_feedback("password deleted")
+                await self.open()
+            elif response.status == 401:
+                await self._interface.close_session()
+            else:
+                await self._interface.handling_unexpected_error(response)
+
+    async def update_notifications_time(self):
+        hour = storage.get(f"hour:{self._interface.chat_id}")
+        minute = storage.get(f"minute:{self._interface.chat_id}")
+
+        async with self._interface.session.patch('/notification_time', json={"hour": hour, "minute": minute}) as response:
             if response.status == 200:
                 self.text_map["notification_time"].data = f"{hour}:{minute}"
                 await self._interface.update_notification_time()
-                await self.open(state, session=session)
+                await self.open()
             elif response.status == 401:
-                await self._interface.close_session(state)
+                await self._interface.close_session()
             else:
-                await self._interface.handling_unexpected_error(state, response)
+                await self._interface.handling_unexpected_error(response)
         
         storage.delete(f"hour:{self._interface.chat_id}", f"minute:{self._interface.chat_id}")
 
 
-class CreatePassword(TextMarkup):
+class InputPassword(TextMarkup):
     def __init__(self, interface):
         super().__init__(
             interface,
@@ -251,13 +291,13 @@ class CreatePassword(TextMarkup):
             state=States.input_password
         )
 
-    async def __call__(self, password: str, state: FSMContext):
+    async def __call__(self, password: str):
         if len(password) > MAX_PASSWORD_LENGTH:
             await self._interface.update_feedback(f"Maximum password length is {MAX_PASSWORD_LENGTH} symbols")
-            await self.open(state)
+            await self.open()
         else:
             storage.set(f'password:{self._interface.chat_id}', password)
-            await self._interface.basic_manager.repeat_password.open(state)
+            await self._interface.basic_manager.repeat_password.open()
 
 
 class RepeatPassword(TextMarkup):
@@ -279,16 +319,14 @@ class RepeatPassword(TextMarkup):
             state=States.repeat_password
         )
 
-    async def __call__(self, password: str, state: FSMContext, session: ClientSession):
-        print()
+    async def __call__(self, password: str):
         if password != storage.get(f"password:{self._interface.chat_id}"):
             await self._interface.update_feedback("Passwords not matched")
-            await self._interface.basic_manager.input_password.open(state)
+            await self._interface.basic_manager.input_password.open()
         else:
             storage.set(f"password_grade:{self._interface.chat_id}", zxcvbn(password))
             storage.set(f"hash:{self._interface.chat_id}", pbkdf2_sha256.hash(password))
-            storage.delete(f"password:{self._interface.chat_id}")
-            await self._interface.basic_manager.resume_password.open(state, session=session)
+            await self._interface.basic_manager.resume_password.open()
 
 
 class PasswordResume(TextMarkup):
@@ -316,29 +354,18 @@ class PasswordResume(TextMarkup):
                     {
                         "accept_password": ButtonWidget(
                             text=f"{Emoji.OK + Emoji.KEY} Accept password",
+                            callback_data="update_password"
                         )
                     },
                     {
-                        "back": ButtonWidget(text=f'{Emoji.DENIAL} Cancel', callback_data="input_password")
+                        "back": ButtonWidget(text=f'{Emoji.CYCLE} Change password', callback_data="input_password")
                     }
                 ]
             ),
         )
 
-    async def open(self, state, **kwargs):
-        async with kwargs["session"].get(f"/is_password_set/{await self._interface.encoded_chat_id()}") as response:
-            if response.status == 200:
-                response = await response.text()
-                if response == '1':
-                    self.markup_map['accept_password'].callback_data = 'update_password'
-                else:
-                    self.markup_map['accept_password'].callback_data = 'create_email'
-            else:
-                await self._interface.handling_unexpected_error(state, response)
-                return
-
+    async def open(self):
         password_grade = storage.get(f'password_grade:{self._interface.chat_id}')
-        storage.delete(f'password_grade:{self._interface.chat_id}')
 
         self.text_map['strength'].data = self._strength_marks[password_grade['score']]
 
@@ -355,15 +382,15 @@ class PasswordResume(TextMarkup):
             self.text_map['suggestions'].data = suggestions_
             self.text_map['suggestions'].on()
 
-        await super().open(state)
+        await super().open()
         await self.text_map['warning'].reset()
         self.text_map['warning'].off()
         await self.text_map['suggestions'].reset()
         self.text_map['suggestions'].off()
-        await self._interface.update_interface_in_redis(state)
+        await self._interface.update_interface_in_redis()
 
 
-class CreateEmail(TextMarkup):
+class InputEmail(TextMarkup):
     def __init__(self, interface):
         super().__init__(
             interface,
@@ -382,13 +409,13 @@ class CreateEmail(TextMarkup):
             state=States.input_email
         )
 
-    async def __call__(self, email: str, state):
+    async def __call__(self, email: str):
         if len(email) > MAX_EMAIL_LENGTH:
             await self._interface.update_feedback(f'Max email length is {MAX_EMAIL_LENGTH} symbols.')
-            await self.open(state)
+            await self.open()
         elif not re.fullmatch(r'\w+@\w+\.\w+', email, flags=re.I):
             await self._interface.update_feedback('Allowable format is example@email.com', type_="error")
-            await self.open(state)
+            await self.open()
         else:
             await self._interface.temp_message("Sending...")
             verify_code = await Mailing.verify_email(email)
@@ -398,10 +425,10 @@ class CreateEmail(TextMarkup):
                                                       type_='info')
                 storage.setex(f"verify_email_code:{self._interface.chat_id}", VERIFY_CODE_EXPIRATION, verify_code)
                 storage.set(f"email:{self._interface.chat_id}", email)
-                await self._interface.basic_manager.input_verify_email_code.open(state)
+                await self._interface.basic_manager.input_verify_email_code.open()
             else:
                 await self._interface.update_feedback(f"Email {email} not found", type_="error")
-                await self.open(state)
+                await self.open()
 
 
 class InputVerifyEmailCode(TextMarkup):
@@ -418,27 +445,26 @@ class InputVerifyEmailCode(TextMarkup):
             markup_map=MarkupMap(
                 [
                     {
-                        "back": ButtonWidget(text=f'{Emoji.BACK} Change email', callback_data="create_email")
+                        "back": ButtonWidget(text=f'{Emoji.CYCLE} Change email', callback_data="create_email")
                     }
                 ]
             ),
             state=States.input_verify_email_code
         )
 
-    async def __call__(self, verify_code, state, session: ClientSession):
+    async def __call__(self, verify_code):
         await self._interface.temp_message()
         verify_code_ = storage.getex(f"verify_email_code:{self._interface.chat_id}")
         if verify_code_ is None:
             email = storage.get(f"email:{self._interface.chat_id}")
             storage.setex(f"verify_email_code:{self._interface.chat_id}", VERIFY_CODE_EXPIRATION, await Mailing.verify_email(email))
             await self._interface.update_feedback(f"Verify code expired. New code sended on email: {email}", type_="info")
-            await self.open(state)
+            await self.open()
         elif verify_code != verify_code_:
             await self._interface.update_feedback(f'Wrong verify code', type_="error")
-            await self.open(state)
+            await self.open()
         else:
-            await self._interface.basic_manager.options.update_password(session, state)
-            storage.delete(f"verify_email_code:{self._interface.chat_id}")
+            await self._interface.basic_manager.options.update_email()
 
 
 class NotificationHourCallbackData(CallbackData, prefix="notification_hour"):
@@ -471,9 +497,9 @@ class ChangeNotificationsHour(TextMarkup):
             )
         )
 
-    async def __call__(self, hour: int, state):
+    async def __call__(self, hour: int):
         storage.set(f"hour:{self._interface.chat_id}", hour)
-        await self._interface.basic_manager.change_notification_minute.open(state)
+        await self._interface.basic_manager.change_notification_minute.open()
 
 
 class NotificationMinuteCallbackData(CallbackData, prefix="notification_minute"):
@@ -513,9 +539,9 @@ class ChangeNotificationsMinute(TextMarkup):
             )
         )
 
-    async def __call__(self, minute: int, state: FSMContext, session: ClientSession):
+    async def __call__(self, minute: int):
         storage.set(f"minute:{self._interface.chat_id}", minute)
-        await self._interface.basic_manager.options.update_notifications_time(session, state)
+        await self._interface.basic_manager.options.update_notifications_time()
 
 
 class AuthorizationWithPassword(TextMarkup):
@@ -534,29 +560,92 @@ class AuthorizationWithPassword(TextMarkup):
                             text=f'{Emoji.CYCLE} Reset password',
                             callback_data='reset_password'
                         )
+                    },
+                    {
+                        "back": ButtonWidget(
+                            text=f"{Emoji.BACK} Back",
+                            callback_data="title_screen"
+                        )
                     }
                 ]
             ),
             state=States.sign_in_with_password
         )
 
-    async def __call__(self, state: FSMContext, session: ClientSession, password: str):
-        async with session.post('/sign_in', json={
+    async def open(self):
+        async with self._interface.session.get(f"/is_email_set/{await self._interface.encoded_chat_id()}") as response:
+            if response.status == 200:
+                response = await response.text()
+                if response == '1':
+                    self.markup_map['reset_password'].on()
+                else:
+                    self.markup_map['reset_password'].off()
+            else:
+                await self._interface.handling_unexpected_error(response)
+
+        await super().open()
+
+    async def __call__(self, password: str):
+        async with self._interface.session.post('/sign_in', json={
             'telegram_id': self._interface.chat_id, "password": password
         }) as response:
             if response.status == 200:
                 self._interface.token = await response.text()
-                await self._interface.basic_manager.profile.open(state)
+                await self._interface.basic_manager.profile.open()
             elif response.status == 401:
-                await self._interface.update_feedback('Wrong password')
-                await self.open(state)
+                await self._interface.update_feedback('Wrong password', type_="error")
+                await self.open()
             else:
-                await self._interface.handling_unexpected_error(state, response)
+                await self._interface.handling_unexpected_error(response)
 
-    async def reset_password(self, state: FSMContext, session: ClientSession):
-        async with session.patch('/reset_password', json={'telegram_id': self._interface.chat_id}) as response:
-            if response == 200:
-                await self._interface.update_feedback(f'New password sent on your email {await response.text()}')
-                await self.open(state)
+    async def reset_password(self):
+        await self._interface.temp_message()
+        async with self._interface.session.get(f'/get_user_email/{await self._interface.encoded_chat_id()}') as response:
+            if response.status == 200:
+                verify_code = await Mailing.verify_email(await response.text())
+                storage.setex(f"verify_email_code:{self._interface.chat_id}", VERIFY_CODE_EXPIRATION, verify_code)
+                await self._interface.update_feedback('Verify code sent on your email', type_="info")
+                await self._interface.basic_manager.input_verify_code_reset_password.open()
             else:
-                await self._interface.handling_unexpected_error(state, response)
+                await self._interface.handling_unexpected_error(response)
+
+
+class InputVerifyCodeResetPassword(TextMarkup):
+    def __init__(self, interface):
+        super().__init__(
+            interface,
+            text_map=TextMap(
+                {
+                    "action": TextWidget(
+                        text=f'{Emoji.LOCK_AND_KEY} Enter verify code'
+                    )
+                }
+            ),
+            markup_map=MarkupMap(
+                [
+                    {
+                        "back": ButtonWidget(text=f'{Emoji.BACK} Back', callback_data="title_screen")
+                    }
+                ]
+            ),
+            state=States.input_verify_code_reset_password
+        )
+
+    async def __call__(self, verify_code):
+        await self._interface.temp_message()
+        verify_code_ = storage.getex(f"verify_email_code:{self._interface.chat_id}")
+        if verify_code_ is None:
+            async with self._interface.session.get(
+                    f'/get_user_email/{await self._interface.encoded_chat_id()}') as response:
+                if response.status == 200:
+                    verify_code = await Mailing.verify_email(await response.text())
+                    storage.setex(f"verify_email_code:{self._interface.chat_id}", VERIFY_CODE_EXPIRATION, verify_code)
+                    self._interface.update_feedback("Verify code expired. New code sent on your email.", type_="info")
+                    await self.open()
+                else:
+                    await self._interface.handling_unexpected_error()
+        elif verify_code != verify_code_:
+            self._interface.update_feedback("Wrong verify code", type_="info")
+            await self.open()
+        else:
+            await self._interface.basic_manager.input_password.open()

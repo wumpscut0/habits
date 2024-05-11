@@ -11,3 +11,4 @@ class States(StatesGroup):
     create_target_border = State()
     update_target_name = State()
     update_target_description = State()
+    input_verify_code_reset_password = State()

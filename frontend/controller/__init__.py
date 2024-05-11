@@ -33,30 +33,33 @@ class Interface(SerializableMixin):
         self.token = None
         self.feedback = DataTextWidget(active=False)
 
-        self._message_id = None
+        self.state = None
+        self.session = None
+
         self._current_markup = None
         self._trash = []
 
-    async def open_session(self, state, session: ClientSession, close_msg='Session close'):
-        await self._reset_state(state)
-
+    async def reset_session(self, close_msg='Session close'):
+        await self._reset_state()
+        message_id = storage.get(f"{self.chat_id}")
         try:
             message = await bot.edit_message_text(
                 chat_id=self.chat_id,
-                message_id=self._message_id,
+                message_id=message_id,
                 text=close_msg
             )
             self._trash.append(message.message_id)
         except TelegramBadRequest:
             pass
 
-        async with session.get(f'/notification_is_on/{await encode_jwt({"telegram_id": self.chat_id})}') as response:
+        async with self.session.get(f'/notification_is_on/{await encode_jwt({"telegram_id": self.chat_id})}') as response:
             response_ = await response.text()
             if response_ == '1':
                 self.basic_manager.title_screen.markup_map["notifications"].mark = Emoji.BELL
             elif response_ == '0':
                 self.basic_manager.title_screen.markup_map["notifications"].mark = Emoji.NOT_BELL
             else:
+                self.basic_manager.title_screen.markup_map["notifications"].mark = Emoji.RED_QUESTION
                 errors.error(f'Unsuccessfully check notification, return code: {response.status}')
 
         message = await bot.send_message(
@@ -64,27 +67,30 @@ class Interface(SerializableMixin):
             text=await self.basic_manager.title_screen.text,
             reply_markup=await self.basic_manager.title_screen.markup
         )
-        self._message_id = message.message_id
 
-        await self.update_interface_in_redis(state)
+        storage.set(f"{self.chat_id}", message.message_id)
 
-    async def close_session(self, state):
-        await self._reset_state(state)
-        await self.basic_manager.title_screen.open(state)
+        await self.update_interface_in_redis()
+
+    async def close_session(self):
+        await self._reset_state()
+        await self.basic_manager.title_screen.open()
 
     async def clear(self, state):
-        if self.chat_id is not None and self._message_id is not None:
-            await bot.delete_message(chat_id=self.chat_id, message_id=self._message_id)
+        message_id = storage.get(f"{self.chat_id}")
+        if self.chat_id is not None and message_id is not None:
+            await bot.delete_message(chat_id=self.chat_id, message_id=message_id)
         await self.clean_trash()
         await state.clear()
 
-    async def update(self, state: FSMContext, markup: TextMarkup):
+    async def update(self, markup: TextMarkup):
         self._current_markup = markup
-        await state.set_state(markup.state)
+        message_id = storage.get(f"{self.chat_id}")
+        await self.state.set_state(markup.state)
         try:
             await bot.edit_message_text(
                 chat_id=self.chat_id,
-                message_id=self._message_id,
+                message_id=message_id,
                 text=(await markup.text) + ('\n' + self.feedback.text.as_html() if self.feedback.active else ''),
                 reply_markup=await markup.markup
             )
@@ -94,7 +100,7 @@ class Interface(SerializableMixin):
         await self.feedback.reset()
         self.feedback.off()
         await self.clean_trash()
-        await self.update_interface_in_redis(state)
+        await self.update_interface_in_redis()
 
     async def update_feedback(self, msg: str, type_: Literal["default", "info", "error"] = "default", active=True):
         self.feedback.header = self._feedback_headers[type_]
@@ -116,23 +122,23 @@ class Interface(SerializableMixin):
     async def refill_trash(self, message_id: int):
         self._trash.append(message_id)
 
-    async def handling_unexpected_error(self, state, response):
-        await self.update_feedback('internal server error')
-        await self._current_markup.open(state)
+    async def handling_unexpected_error(self, response):
+        await self.update_feedback('internal server error', type_="error")
+        await self._current_markup.open()
 
         try:
             response_ = await response.json()
             errors.error(
                 f"Current markup: {self._current_markup.__class__.__name__}\nDetail: {response_['detail']}\nStatus: {response.status}"
             )
-        except ContentTypeError:
+        except (ContentTypeError, Exception):
             errors.error("internal server error")
 
     async def encoded_chat_id(self):
         return await encode_jwt({'telegram_id': self.chat_id})
 
-    async def notification_on(self, session: ClientSession):
-        async with session.get(f'/notification_time/{await self.encoded_chat_id()}') as response:
+    async def notification_on(self):
+        async with self.session.get(f'/notification_time/{await self.encoded_chat_id()}') as response:
             if response.status == 200:
                 time_ = await response.json()
                 scheduler.add_job(
@@ -156,17 +162,24 @@ class Interface(SerializableMixin):
         except JobLookupError:
             pass
 
-    async def update_interface_in_redis(self, state):
+    async def update_interface_in_redis(self):
+        state = self.state
+        session = self.session
+        self.state = None
+        self.session = None
         await state.update_data({'interface': await self.serialize()})
+        self.state = state
+        self.session = session
 
     async def temp_message(self, msg="Processing..."):
+        message_id = storage.get(f"{self.chat_id}")
         try:
-            await bot.edit_message_text(text=msg, chat_id=self.chat_id, message_id=self._message_id)
+            await bot.edit_message_text(text=msg, chat_id=self.chat_id, message_id=message_id)
         except TelegramBadRequest:
             pass
 
-    async def _reset_state(self, state: FSMContext):
-        await state.set_state(None)
+    async def _reset_state(self):
+        await self.state.set_state(None)
         self.token = None
 
 

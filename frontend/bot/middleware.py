@@ -16,31 +16,45 @@ class CommonMiddleware(BaseMiddleware):
         event: Update,
         data: Dict[str, Any]
     ) -> Any:
-        # await data['state'].clear()
         current_data = await data['state'].get_data()
         interface = current_data.get('interface')
 
         if interface is not None:
-            interface = await deserialize(interface)
-            session_context = ClientSession(
-                os.getenv('BACKEND'),
+            try:
+                interface = await deserialize(interface)
+                headers = {"Authorization": interface.token if interface.token is not None else "None"}
+            except (AttributeError, Exception):
+                headers = {"Authorization": "None"}
+                await data['state'].clear()
+                interface = None
 
-                headers={"Authorization": interface.token if interface.token is not None else "None"}
-            )
         else:
-            session_context = ClientSession(
-                os.getenv('BACKEND'),
-                headers={"Authorization": "None"}
-            )
+            headers = {"Authorization": "None"}
+
+        session_context = ClientSession(
+            os.getenv('BACKEND'),
+            headers=headers
+        )
 
         async with session_context as session:
             data['session'] = session
             if interface is None:
-                user_id = event.message.from_user.id
+                try:
+                    user_id = event.message.chat.id
+                    first_name = event.message.from_user.first_name
+                    await event.message.delete()
+                except AttributeError:
+                    user_id = event.callback_query.message.chat.id
+                    first_name = event.callback_query.from_user.first_name
 
                 await session.post('/sign_up', json={'telegram_id': user_id})
 
-                current_data['interface'] = Interface(user_id, event.message.from_user.first_name)
+                interface = Interface(user_id, first_name)
+
+                interface.state = data["state"]
+                interface.session = session
+                await interface.reset_session()
+
             else:
                 if event.message is not None:
                     first_name = event.message.from_user.first_name
@@ -48,8 +62,10 @@ class CommonMiddleware(BaseMiddleware):
 
                 current_data['interface'] = interface
 
-            data['interface'] = current_data['interface']
-            current_data['interface'] = await current_data['interface'].serialize()
-            await data['state'].update_data(current_data)
+                data['interface'] = current_data['interface']
+                current_data['interface'] = await current_data['interface'].serialize()
+                await data['state'].update_data(current_data)
 
-            return await handler(event, data)
+                interface.state = data["state"]
+                interface.session = session
+                return await handler(event, data)

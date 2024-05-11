@@ -199,8 +199,8 @@ class TextMarkup:
         self.markup_map = markup_map
         self.state = state
 
-    async def open(self, state, **kwargs):
-        await self._interface.update(state, self)
+    async def open(self):
+        await self._interface.update(self)
 
     @property
     async def text(self):

@@ -6,7 +6,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from frontend.bot.FSM import States
 from frontend.markups.core import *
-from frontend.utils import config, Emoji
+from frontend.utils import config, Emoji, storage
 from frontend.utils.scheduler import scheduler, remainder
 
 MAX_EMAIL_LENGTH = config.getint('limitations', 'MAX_EMAIL_LENGTH')
@@ -73,25 +73,25 @@ class TargetsControl(TextMarkup):
             )
         )
 
-    async def create_target(self, session, state):
+    async def create_target(self):
         name = self._interface.storage["target_name"]
         border = self._interface.storage["target_border"]
 
-        async with session.post('/create_target', json={
+        async with self._interface.session.post('/create_target', json={
             "name": name,
             "border": border
         }) as response:
             if response.status == 200:
                 await self._interface.update_feedback(f'{Emoji.SPROUT} Target with name {name} created')
-                async with session.get('/notification_time') as response_:
+                async with self._interface.session.get('/notification_time') as response_:
                     time = (await response_.json())
                     hour, minute = time["hour"], time['minute']
-                await self._interface.targets_manager.targets_control.open(state)
+                await self._interface.targets_manager.targets_control.open()
                 scheduler.add_job(func=remainder, trigger=CronTrigger(hour=hour, minute=minute), args=(self._interface.chat_id,), replace_existing=True, id=self._interface.chat_id)
             elif response.status == 401:
-                await self._interface.close_session(state)
+                await self._interface.close_session()
             else:
-                await self._interface.handling_unexpected_error(state)
+                await self._interface.handling_unexpected_error()
 
         self._interface.storage.update({"target_name": None, "target_border": STANDARD_BORDER_RANGE})
 
@@ -127,8 +127,8 @@ class ShowCompletedTargets(TextMarkup):
             ),
         )
 
-    async def open(self, state: FSMContext, **kwargs):
-        async with kwargs["session"].get('/completed_targets') as response:
+    async def open(self):
+        async with self._interface.session.get('/completed_targets') as response:
             if response.status == 200:
                 targets = await response.json()
                 self.text_map["info"].data = len(targets)
@@ -137,18 +137,18 @@ class ShowCompletedTargets(TextMarkup):
                         {
                             "name": ButtonWidget(
                                 text=target["name"],
-                                callback_data=ShowCompletedTargetCallbackData(id=kwargs["target_id"])
+                                callback_data=ShowCompletedTargetCallbackData(id=self._interface.targets_manager.current_target_id)
                             )
                         }
                     )
-                await super().open(state)
+                await super().open()
             elif response.status == 404:
                 await self._interface.update_feedback("no completed targets so far")
-                await self._interface.targets_manager.targets_control.open(state)
+                await self._interface.targets_manager.targets_control.open()
             elif response.status == 401:
-                await self._interface.close_session(state)
+                await self._interface.close_session()
             else:
-                await self._interface.handling_unexpected_error(state)
+                await self._interface.handling_unexpected_error()
 
 
 class CompletedTarget(TextMarkup):
@@ -175,9 +175,9 @@ class CompletedTarget(TextMarkup):
             )
         )
 
-    async def open(self, state, **kwargs):
+    async def open(self, **kwargs):
         self._interface.targets_manager.current_target_id = kwargs["target_id"]
-        async with kwargs["session"].get(f"/target/{kwargs['target_id']}") as response:
+        async with self._interface.session.get(f"/target/{kwargs['target_id']}") as response:
             target = await response.json()
 
         self.text_map['name'].data = target["name"]
@@ -191,7 +191,7 @@ class CompletedTarget(TextMarkup):
 
         self.text_map['completed_datetime'].data = target["completed_datetime"]
 
-        await super().open(state)
+        await super().open()
 
 
 class CreateTargetName(TextMarkup):
@@ -213,17 +213,17 @@ class CreateTargetName(TextMarkup):
             States.create_target_name
         )
 
-    async def __call__(self, name: str, session: ClientSession, state: FSMContext):
-        self._interface.storage["target_border"] = STANDARD_BORDER_RANGE
+    async def __call__(self, name: str):
+        storage.set(f"target_border:{self._interface.chat_id}", STANDARD_BORDER_RANGE)
 
         if len(name) > MAX_NAME_LENGTH:
-            await self._interface.update_feedback(f"Maximum name length is {MAX_NAME_LENGTH} simbols")
-            await self.open(state)
+            await self._interface.update_feedback(f"Maximum name length is {MAX_NAME_LENGTH} simbols", type_="error")
+            await self.open()
         elif not re.fullmatch(r'[\w\s]+', name, flags=re.I):
-            await self._interface.update_feedback(f"Name must contains only latin symbols or _ or spaces or digits")
-            await self.open(state)
+            await self._interface.update_feedback(f"Name must contains only latin symbols or _ or spaces or digits", type_="error")
+            await self.open()
         else:
-            await self._interface.targets_manager.input_target_border.open(state)
+            await self._interface.targets_manager.input_target_border.open()
 
 
 class CreateTargetBorder(TextMarkup):

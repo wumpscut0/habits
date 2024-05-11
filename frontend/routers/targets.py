@@ -14,8 +14,8 @@ targets_router = Router()
 
 
 @targets_router.callback_query(F.data == 'targets_control')
-async def open_targets_control(callback: CallbackQuery, interface: Interface, state: FSMContext):
-    await interface.targets_manager.targets_control.state(state)
+async def open_targets_control(callback: CallbackQuery, interface: Interface):
+    await interface.targets_manager.targets_control.state()
 
 
 ########################################################################################################################

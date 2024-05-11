@@ -6,7 +6,7 @@ from pydantic import BaseModel, field_validator
 from backend.utils import config
 
 MAX_PASSWORD_LENGTH = config.getint('limitations', "MAX_PASSWORD_LENGTH")
-MAX_EMAIL_LENGTH = config.get('limitations', "MAX_EMAIL_LENGTH")
+MAX_EMAIL_LENGTH = config.getint('limitations', "MAX_EMAIL_LENGTH")
 MAX_DESCRIPTION_LENGTH = config.getint('limitations', "MAX_DESCRIPTION_LENGTH")
 MIN_BORDER_RANGE = config.getint('limitations', "MIN_BORDER_RANGE")
 MAX_BORDER_RANGE = config.getint('limitations', "MAX_BORDER_RANGE")
@@ -33,7 +33,11 @@ class AuthApiModel(BaseModel):
 
 
 class UpdatePasswordApiModel(BaseModel):
-    hash_: str
+    telegram_id: int
+    hash: str
+
+
+class UpdateEmailApiModel(BaseModel):
     email: str | None = None
 
     @field_validator('email', mode='before')

@@ -2,15 +2,14 @@ import os
 from typing import Annotated
 from datetime import time, UTC
 from fastapi import Header, Request, FastAPI, HTTPException
-from passlib.handlers.pbkdf2 import pbkdf2_sha256
 from starlette.responses import PlainTextResponse
 
 from backend.database import Session
-from backend.routers.models import AuthApiModel, TelegramIdApiModel, UpdatePasswordApiModel, TargetApiModel, NotificationTimeApiModel
+from backend.routers.models import AuthApiModel, TelegramIdApiModel, UpdatePasswordApiModel, TargetApiModel, \
+    NotificationTimeApiModel, UpdateEmailApiModel
 from backend.database.queries import AuthQueries, TargetsQueries, CommonQueries
 from backend.utils import decode_jwt
 from backend.utils.loggers import errors
-from backend.utils.mailing import Mailing
 
 app = FastAPI()
 
@@ -39,33 +38,68 @@ async def is_password_set(user_id: str):
         return "0"
 
 
-@app.patch('/update_password')
-async def update_password_(update_password_api_model: UpdatePasswordApiModel, Authorization: Annotated[str, Header()]):
+@app.patch('/update_password/{jwt}')
+async def update_password(jwt: str):
+    data = await decode_jwt(jwt)
+    data = UpdatePasswordApiModel.model_validate(data)
     async with Session.begin() as session:
-        telegram_id = await AuthQueries.authentication(session, Authorization)
-        await CommonQueries.update_password(session, telegram_id, update_password_api_model.hash)
-if update_password_api_model.email is not None:
-    await CommonQueries.update_email(session, telegram_id, update_password_api_model.email)
+        await CommonQueries.update_password(session, **data.model_dump())
 
 
-@app.patch("/reset_password")
-async def reset_password(Authorization: Annotated[str, Header()]):
-    async with Session.begin() as session:
-        telegram_id = await AuthQueries.authentication(session, Authorization)
-        email = await CommonQueries.get_user_email(session, telegram_id)
-        if email is None:
-            raise HTTPException(404, 'User not found')
-        new_password = await Mailing.send_new_password(email)
-        hash_ = pbkdf2_sha256.hash(new_password)
-        await CommonQueries.update_password(session, telegram_id, hash_)
-        return email
+# @app.patch("/reset_password/{user_id}")
+# async def reset_password(user_id):
+#     data = await decode_jwt(user_id)
+#     async with Session.begin() as session:
+#         email = await CommonQueries.get_user_email(session, data["telegram_id"])
+#         if email is None:
+#             raise HTTPException(404, 'User not found')
+#         return await Mailing.verify_email(email)
 
 
-@app.delete("delete_password")
+@app.delete("/delete_password")
 async def delete_password(Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
         telegram_id = await AuthQueries.authentication(session, Authorization)
         await CommonQueries.delete_password(session, telegram_id)
+
+
+########################################################################################################################
+
+
+@app.get('/is_email_set/{user_id}', response_class=PlainTextResponse)
+async def is_email_set(user_id: str):
+    data = await decode_jwt(user_id)
+    async with Session.begin() as session:
+        if await CommonQueries.is_email_set(session, data["telegram_id"]) is not None:
+            return "1"
+        return "0"
+
+
+@app.patch('/update_email')
+async def update_email(update_password_api_model: UpdateEmailApiModel, Authorization: Annotated[str, Header()]):
+    async with Session.begin() as session:
+        telegram_id = await AuthQueries.authentication(session, Authorization)
+        await CommonQueries.update_email(session, telegram_id, update_password_api_model.email)
+
+
+@app.delete("/delete_email")
+async def delete_password(Authorization: Annotated[str, Header()]):
+    async with Session.begin() as session:
+        telegram_id = await AuthQueries.authentication(session, Authorization)
+        await CommonQueries.delete_email(session, telegram_id)
+
+
+@app.get("/get_user_email/{user_id}", response_class=PlainTextResponse)
+async def get_user_email(user_id: str):
+    data = await decode_jwt(user_id)
+    async with Session.begin() as session:
+        email = await CommonQueries.get_user_email(session, data["telegram_id"])
+        if email is None:
+            raise HTTPException(404)
+        return email
+
+
+########################################################################################################################
 
 
 @app.patch("/invert_notifications/{user_id}")
@@ -134,15 +168,6 @@ async def get_target(target_id: int, Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
         await AuthQueries.authentication(session, Authorization)
         return TargetsQueries.get_target(session, target_id)
-
-
-@app.get("/has_a_mail")
-async def has_a_mail(Authorization: Annotated[str, Header()]):
-    async with Session.begin() as session:
-        telegram_id = await AuthQueries.authentication(session, Authorization)
-        return {
-            "email": CommonQueries.get_user_email(session, telegram_id.telegram_id)
-        }
 
 
 @app.post('/create_target')

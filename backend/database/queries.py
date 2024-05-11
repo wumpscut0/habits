@@ -25,7 +25,7 @@ class AuthQueries:
     async def authorisation(session: AsyncSession, telegram_id: int, password: str | None = None):
         user = await CommonQueries.user(session, telegram_id)
         if user.hash is not None and password is None:
-            raise HTTPException(400, 'Give me password')
+            raise HTTPException(401, 'Give me password')
         elif user.hash is not None and password:
             await verify_password(password, user.hash)
 
@@ -49,6 +49,19 @@ class CommonQueries:
     async def is_password_set(session: AsyncSession, telegram_id: int):
         return (await session.execute(select(UserORM.hash)
                                       .where(UserORM.telegram_id == telegram_id))).scalar_one_or_none()
+
+    @staticmethod
+    async def is_email_set(session: AsyncSession, telegram_id: int):
+        return (await session.execute(select(UserORM.email)
+                                      .where(UserORM.telegram_id == telegram_id))).scalar_one_or_none()
+
+    @staticmethod
+    async def update_email(session: AsyncSession, telegram_id: int, email: str):
+        await session.execute(update(UserORM).where(UserORM.telegram_id == telegram_id).values({"email": email}))
+
+    @staticmethod
+    async def delete_email(session: AsyncSession, telegram_id: int):
+        await session.execute(update(UserORM).where(UserORM.telegram_id == telegram_id).values({"email": None}))
 
     @staticmethod
     async def users_ids(session: AsyncSession):
@@ -81,17 +94,12 @@ class CommonQueries:
         return (await session.execute(select(UserORM.email).where(UserORM.telegram_id == telegram_id))).scalar()
 
     @staticmethod
-    async def update_password(session: AsyncSession, telegram_id: int, hash_: str):
-        print(isinstance(telegram_id, int))
-        await session.execute(update(UserORM).where(UserORM.telegram_id == telegram_id).values({"password": hash_}))
+    async def update_password(session: AsyncSession, telegram_id: int, hash: str):
+        await session.execute(update(UserORM).where(UserORM.telegram_id == telegram_id).values({"hash": hash}))
 
     @staticmethod
     async def delete_password(session: AsyncSession, telegram_id: int):
-        await session.execute(delete(UserORM.hash).where(UserORM.telegram_id == telegram_id))
-
-    @staticmethod
-    async def update_email(session: AsyncSession, telegram_id: int, email: str):
-        await session.execute(update(UserORM).where(UserORM.telegram_id == telegram_id).values({"email": email}))
+        await session.execute(update(UserORM).where(UserORM.telegram_id == telegram_id).values({"hash": None}))
 
     @staticmethod
     async def invert_user_notifications(session: AsyncSession, telegram_id: int):

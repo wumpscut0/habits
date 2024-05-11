@@ -1,3 +1,5 @@
+from smtplib import SMTPException
+
 import aiosmtplib
 import secrets
 import string
@@ -15,17 +17,26 @@ SMTP_SERVER = config.get('mailing', 'SMTP_SERVER')
 
 class Mailing:
     @classmethod
-    def _generate_new_password(cls, length=8):
-        return ''.join((secrets.choice(string.ascii_letters + string.digits) for _ in range(length)))
+    async def _generate_secret_key(cls):
+        return ''.join((secrets.choice(string.digits) for _ in range(6)))
 
     @classmethod
-    async def send_new_password(cls, receiver):
-        new_password = cls._generate_new_password()
-        message = MIMEText(f"Your new password: {new_password}")
+    async def verify_email(cls, receiver):
+        verify_code = await cls._generate_secret_key()
+        message = MIMEText(f'Your verify code for reset password: {verify_code}')
         message['To'] = receiver
         message['From'] = MAIL_ADDRESS
         message['Subject'] = 'Reset password'
-        async with aiosmtplib.SMTP(hostname=SMTP_SERVER, port=PORT, username=MAIL_ADDRESS, password=SMTP_PASSWORD,
-                                   start_tls=True) as session:
-            await session.sendmail(MAIL_ADDRESS, receiver, message.as_string())
-        return new_password
+        async with aiosmtplib.SMTP(
+                hostname=SMTP_SERVER,
+                username=MAIL_ADDRESS,
+                port=PORT,
+                password=SMTP_PASSWORD,
+                use_tls=True
+        ) as connect:
+            try:
+                await connect.sendmail(MAIL_ADDRESS, receiver, message.as_string())
+            except SMTPException:
+                return
+
+            return verify_code

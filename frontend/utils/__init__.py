@@ -29,7 +29,9 @@ class CustomRedis(Redis):
         )
 
     def get(self, name: KeyT) -> ResponseT:
-        return pickle.loads(super().get(name))
+        result = super().get(name)
+        if result is not None:
+            return pickle.loads(result)
 
     def setex(self, name: KeyT, time: ExpiryT, value: EncodableT) -> ResponseT:
         return super().setex(
@@ -45,7 +47,9 @@ class CustomRedis(Redis):
         pxat: Union[AbsExpiryT, None] = None,
         persist: bool = False,
     ) -> ResponseT:
-        return pickle.loads(super().getex(name, ex, px, exat, pxat, persist))
+        result = super().getex(name, ex, px, exat, pxat, persist)
+        if result is not None:
+            return pickle.loads(result)
 
 
 storage = CustomRedis(db=2)
