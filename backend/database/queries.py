@@ -118,11 +118,8 @@ class TargetsQueries:
             description: str | None = None,
             border_progress: int | None = None
     ):
-        await session.execute(insert(TargetORM).values({"user_id": telegram_id}, **TargetApiModel(
-            name=name,
-            description=description,
-            border_progress=border_progress
-        ).model_dump()))
+        await session.execute(insert(TargetORM).values(
+            user_id=telegram_id, name=name, description=description, border_progress=border_progress))
 
     @staticmethod
     async def delete(session: AsyncSession, habit_id: int):
@@ -130,10 +127,11 @@ class TargetsQueries:
 
     @staticmethod
     async def get_targets(session: AsyncSession, telegram_id: int):
+
         return [
-            {"name": target.get("name"), "completed": target.get("completed"), "id": target.get("id")}
+            {"name": target.name, "completed": target.completed, "id": target.id}
             for target in (await session.execute(
-                select(TargetORM.name, TargetORM.completed, TargetORM.id)
+                select(TargetORM)
                 .filter(TargetORM.user_id == telegram_id, TargetORM.progress != TargetORM.border_progress)
             )).scalars()
         ]
@@ -147,6 +145,18 @@ class TargetsQueries:
                 .filter(
                 TargetORM.user_id == telegram_id,
                 TargetORM.progress == TargetORM.border_progress)
+            )).scalars()
+        ]
+
+    @staticmethod
+    async def get_completed_targets_today(session: AsyncSession, telegram_id: int):
+        return [
+            {"name": target.get("name"), "id": target.get("id")}
+            for target in (await session.execute(
+                select(TargetORM.name, TargetORM.id)
+                .filter(
+                    TargetORM.user_id == telegram_id,
+                    TargetORM.completed)
             )).scalars()
         ]
 

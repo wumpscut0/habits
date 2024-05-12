@@ -7,6 +7,7 @@ from aiohttp import ClientSession
 
 from frontend.controller import Interface
 from frontend.utils import deserialize
+from frontend.utils.loggers import errors
 
 
 class CommonMiddleware(BaseMiddleware):
@@ -68,4 +69,22 @@ class CommonMiddleware(BaseMiddleware):
 
                 interface.state = data["state"]
                 interface.session = session
-                return await handler(event, data)
+                try:
+                    return await handler(event, data)
+                except Exception as e:
+                    errors.critical(f"Last markup: {interface._current_markup.__class__.__name__} | {e}")
+                    try:
+                        user_id = event.message.chat.id
+                        first_name = event.message.from_user.first_name
+                        await event.message.delete()
+                    except AttributeError:
+                        user_id = event.callback_query.message.chat.id
+                        first_name = event.callback_query.from_user.first_name
+
+                    await session.post('/sign_up', json={'telegram_id': user_id})
+
+                    interface = Interface(user_id, first_name)
+
+                    interface.state = data["state"]
+                    interface.session = session
+                    await interface.reset_session()

@@ -7,6 +7,7 @@ from backend.utils import config
 
 MAX_PASSWORD_LENGTH = config.getint('limitations', "MAX_PASSWORD_LENGTH")
 MAX_EMAIL_LENGTH = config.getint('limitations', "MAX_EMAIL_LENGTH")
+MAX_NAME_LENGTH = config.getint("limitations", "MAX_NAME_LENGTH")
 MAX_DESCRIPTION_LENGTH = config.getint('limitations', "MAX_DESCRIPTION_LENGTH")
 MIN_BORDER_RANGE = config.getint('limitations', "MIN_BORDER_RANGE")
 MAX_BORDER_RANGE = config.getint('limitations', "MAX_BORDER_RANGE")
@@ -53,27 +54,39 @@ class UpdateEmailApiModel(BaseModel):
 
 class TargetApiModel(BaseModel):
     name: str
-    description: str | None = None
     border_progress: int | None = None
+    description: str | None = None
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def name_validate(cls, name):
+        if len(name) > MAX_NAME_LENGTH:
+            raise HTTPException(
+                400,
+                f"Max name length is {MAX_NAME_LENGTH}"
+            )
+        return name
 
     @field_validator('border_progress', mode='before')
     @classmethod
-    def border_progress_validate(cls, border):
-        if not MIN_BORDER_RANGE <= border <= MAX_BORDER_RANGE:
-            raise HTTPException(
-                400,
-                detail=f'Days for completed target must be in range {MIN_BORDER_RANGE} to {MAX_BORDER_RANGE}'
-            )
-        return border
+    def border_validate(cls, border_progress):
+        if border_progress is not None:
+            if not MIN_BORDER_RANGE <= border_progress <= MAX_BORDER_RANGE:
+                raise HTTPException(
+                    400,
+                    detail=f'Days for completed target must be in range {MIN_BORDER_RANGE} to {MAX_BORDER_RANGE}'
+                )
+        return border_progress
 
     @field_validator('description', mode='before')
     @classmethod
     def description_validate(cls, description):
-        if len(description) > MAX_DESCRIPTION_LENGTH:
-            raise HTTPException(
-                400,
-                detail=f'Max description length is {MAX_DESCRIPTION_LENGTH} symbols'
-            )
+        if description is not None:
+            if len(description) > MAX_DESCRIPTION_LENGTH:
+                raise HTTPException(
+                    400,
+                    detail=f'Max description length is {MAX_DESCRIPTION_LENGTH} symbols'
+                )
         return description
 
 

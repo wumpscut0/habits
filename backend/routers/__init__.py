@@ -141,26 +141,22 @@ async def change_notification_time(time_: NotificationTimeApiModel, Authorizatio
         }
 
 
-@app.get('/show_up_targets')
-async def show_up(Authorization: Annotated[str, Header()]):
+########################################################################################################################
+
+
+@app.get('/targets')
+async def targets(Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
         telegram_id = await AuthQueries.authentication(session, Authorization)
-        targets = await TargetsQueries.get_targets(session, telegram_id)
-        if not targets:
-            raise HTTPException(404)
-        else:
-            return targets
-
+        t = await TargetsQueries.get_targets(session, telegram_id)
+        print(t)
+        return t
 
 @app.get("/completed_targets")
 async def get_completed_targets(Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
         telegram_id = await AuthQueries.authentication(session, Authorization)
-        targets = await TargetsQueries.get_completed_targets(session, telegram_id)
-        if not targets:
-            raise HTTPException(404)
-        else:
-            return targets
+        return await TargetsQueries.get_completed_targets(session, telegram_id)
 
 
 @app.get("/target/{target_id}")

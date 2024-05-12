@@ -11,15 +11,11 @@ commands = ["/clear", "/start"]
 
 
 @abyss_router.message(Command(BotCommand(command='clear', description='Clear current state')))
-async def clear(message: Message, interface: Interface, state: FSMContext):
-    await interface.clear(state)
+async def clear(message: Message, interface: Interface):
+    await interface.clear()
     await message.delete()
 
 
 @abyss_router.message(StateFilter(None), ~F.text.in_(commands))
 async def abyss(message: Message):
     await message.delete()
-
-
-
-

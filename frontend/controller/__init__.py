@@ -76,12 +76,17 @@ class Interface(SerializableMixin):
         await self._reset_state()
         await self.basic_manager.title_screen.open()
 
-    async def clear(self, state):
+    async def clear(self):
         message_id = storage.get(f"{self.chat_id}")
         if self.chat_id is not None and message_id is not None:
             await bot.delete_message(chat_id=self.chat_id, message_id=message_id)
         await self.clean_trash()
-        await state.clear()
+        await self.state.clear()
+
+    # async def clear_v2(self):
+    #     interface = Interface(self.chat_id, self.first_name)
+    #     interface.state = self.state
+    #     self.state.clear()
 
     async def update(self, markup: TextMarkup):
         self._current_markup = markup
@@ -124,7 +129,9 @@ class Interface(SerializableMixin):
 
     async def handling_unexpected_error(self, response):
         await self.update_feedback('internal server error', type_="error")
-        await self._current_markup.open()
+        await self._reset_state()
+        await self.clean_trash()
+        await self.basic_manager.title_screen.open()
 
         try:
             response_ = await response.json()
@@ -133,6 +140,8 @@ class Interface(SerializableMixin):
             )
         except (ContentTypeError, Exception):
             errors.error("internal server error")
+
+
 
     async def encoded_chat_id(self):
         return await encode_jwt({'telegram_id': self.chat_id})
