@@ -15,7 +15,8 @@ from frontend.markups.targets import TargetsManager
 from frontend.utils import SerializableMixin, Emoji, encode_jwt, storage
 from frontend.utils.loggers import errors, info
 from frontend.utils.scheduler import scheduler, remainder
-
+async def test():
+    print('!!!!!!!!')
 
 class Interface(SerializableMixin):
     _feedback_headers = {
@@ -141,8 +142,6 @@ class Interface(SerializableMixin):
         except (ContentTypeError, Exception):
             errors.error("internal server error")
 
-
-
     async def encoded_chat_id(self):
         return await encode_jwt({'telegram_id': self.chat_id})
 
@@ -164,10 +163,14 @@ class Interface(SerializableMixin):
             # info.warning(f'With try to delete job, it was not found for user: {self.chat_id}')
 
     async def update_notification_time(self):
-        hour = storage.get("hour")
-        minute = storage.get("minute")
+        await self.notification_off()
+
+        hour = storage.get(f"hour:{self.chat_id}")
+        minute = storage.get(f"minute:{self.chat_id}")
+        print(hour, minute)
         try:
-            scheduler.modify_job(self.chat_id, trigger=CronTrigger(hour=hour, minute=minute))
+            job = scheduler.a(str(self.chat_id), "default", trigger=CronTrigger(hour=hour, minute=minute))
+            info.info(f'Job with id {self.chat_id} modified {job.next_run_time}')
         except JobLookupError:
             pass
 

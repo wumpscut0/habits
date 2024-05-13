@@ -43,4 +43,4 @@ class TargetORM(Base):
     user_id = Column(BIGINT, ForeignKey('user.telegram_id'), nullable=False)
 
     def as_dict_(self):
-        return {c.name: getattr(self, c.name) for c in self.__table__.c.columns}
+        return {column.name: getattr(self, column.name) for column in self.__table__.columns}

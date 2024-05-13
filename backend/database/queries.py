@@ -122,8 +122,8 @@ class TargetsQueries:
             user_id=telegram_id, name=name, description=description, border_progress=border_progress))
 
     @staticmethod
-    async def delete(session: AsyncSession, habit_id: int):
-        await session.execute(delete(TargetORM).where(TargetORM.id == habit_id))
+    async def delete(session: AsyncSession, target_id: int):
+        await session.execute(delete(TargetORM).where(TargetORM.id == target_id))
 
     @staticmethod
     async def get_targets(session: AsyncSession, telegram_id: int):
@@ -168,35 +168,35 @@ class TargetsQueries:
         )).scalar().as_dict_()
 
     @staticmethod
-    async def update_name(session: AsyncSession, telegram_id: int, habit_id: int, name: str):
+    async def update_name(session: AsyncSession, telegram_id: int, target_id: int, name: str):
         await session.execute(
             update(TargetORM)
             .values({'name': name})
-            .filter(TargetORM.user_id == telegram_id, TargetORM.id == habit_id)
+            .filter(TargetORM.user_id == telegram_id, TargetORM.id == target_id)
         )
 
     @staticmethod
-    async def update_description(session: AsyncSession, telegram_id: int, habit_id: int, description: str):
+    async def update_description(session: AsyncSession, telegram_id: int, target_id: int, description: str):
         await session.execute(
             update(TargetORM)
             .values({'description': description})
-            .filter(TargetORM.user_id == telegram_id, TargetORM.id == habit_id)
+            .filter(TargetORM.user_id == telegram_id, TargetORM.id == target_id)
         )
 
     @staticmethod
-    async def invert_completed(session: AsyncSession, telegram_id: int, habit_id: int):
-        target = (await session.execute(
+    async def invert_completed(session: AsyncSession, telegram_id: int, target_id: int):
+        completed = (await session.execute(
             select(TargetORM.completed)
-            .filter(TargetORM.user_id == telegram_id, TargetORM.id == habit_id)
+            .filter(TargetORM.user_id == telegram_id, TargetORM.id == target_id)
         )).scalar()
 
         await session.execute(
             update(TargetORM)
-            .values({'completed': not target.completed})
-            .filter(TargetORM.user_id == telegram_id, TargetORM.id == habit_id)
+            .values({'completed': not completed})
+            .filter(TargetORM.user_id == telegram_id, TargetORM.id == target_id)
 
         )
-        return 1 if target.completed else 0
+        return "1" if completed else "0"
 
     @staticmethod
     async def is_all_done(session: AsyncSession, telegram_id: int):

@@ -69,6 +69,11 @@ async def open_target(callback: CallbackQuery, callback_data: ShowTargetCallback
     await interface.targets_manager.target.open(target_id=callback_data.id)
 
 
+@targets_router.callback_query(F.data == "target")
+async def open_target(callback: CallbackQuery, callback_data: ShowTargetCallbackData, interface: Interface):
+    await interface.targets_manager.target.open()
+
+
 @targets_router.callback_query(F.data == "invert_completed")
 async def invert_completed(callback: CallbackQuery, interface: Interface):
     await interface.targets_manager.target.invert_complete()
@@ -84,7 +89,7 @@ async def open_update_target_name(callback: CallbackQuery, interface: Interface)
 
 @targets_router.message(StateFilter(States.update_target_name), F.text)
 async def update_target_name(message: Message, interface: Interface):
-    await interface.targets_manager.update_target_name.open(message.text)
+    await interface.targets_manager.update_target_name(message.text)
     await message.delete()
 
 

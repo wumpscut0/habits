@@ -1,4 +1,6 @@
 import os
+
+import pytz
 from pytz import utc
 
 import aiohttp
@@ -14,7 +16,7 @@ from frontend.bot import bot
 from frontend.utils import config, Emoji, get_service_key
 from frontend.utils.loggers import info
 
-remainder_text = Bold('Don`t forget mark done target today')
+remainder_text = Bold('Don`t forget mark done target today').as_html()
 remainder_markup = InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -25,10 +27,12 @@ remainder_markup = InlineKeyboardMarkup(
 
 
 async def remainder(chat_id: int):
-    bot.send_message(chat_id=chat_id, text=remainder_text, reply_markup=remainder_markup)
+    info.info(f'Remaining sent to user {chat_id}')
+    await bot.send_message(chat_id=chat_id, text=remainder_text, reply_markup=remainder_markup)
 
 
 async def increase_progress():
+    info.info(f'Progress increased')
     key = await get_service_key()
     async with aiohttp.ClientSession() as session:
         async with session.patch(os.getenv('BACKEND') + f'/increase_targets_progress/{key}') as response:
@@ -36,25 +40,15 @@ async def increase_progress():
                 scheduler.add_job(remainder,  args=(user_id,), replace_existing=True, id=user_id)
 
 
-async def reset_verify_code(interface):
-    interface.storage.update({"verify_code": None, "email": None})
-    r
-    info.info('Reset verify email code completed')
-
-
 DEFAULT_REMAINING_HOUR = config.getint('limitations', "DEFAULT_REMAINING_HOUR")
 
 jobstores = {
     'default': RedisJobStore(host='localhost', port=6379, db=1)
 }
-executors = {
-    'default': ThreadPoolExecutor(max_workers=1000)
-}
-job_defaults = {
-    'coalesce': False,
-    'max_instances': 1
-}
 
 scheduler = AsyncIOScheduler()
-scheduler.configure(jobstores=jobstores, executors=executors, job_defaults=job_defaults, timezone=utc)
+# pytz.timezone('Asia/Novosibirsk')
+scheduler.configure(jobstores=jobstores)
+
 scheduler.add_job(increase_progress, 'cron', hour=0, replace_existing=True, id="increase_progress")
+

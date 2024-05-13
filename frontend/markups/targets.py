@@ -31,7 +31,7 @@ class TargetsManager:
         self.targets = Targets(interface)
         self.target = Target(interface)
 
-        self.completed_targets = ShowCompletedTargets(interface)
+        self.completed_targets = CompletedTargets(interface)
         self.completed_target = CompletedTarget(interface)
 
         self.input_target_name = InputTargetName(interface)
@@ -131,17 +131,27 @@ class TargetsControl(TextMarkup):
         target_id = self._interface.targets_manager.current_target_id
         async with self._interface.session.delete(f'/delete_target/{target_id}') as response:
             if response.status == 200:
-                async with self._interface.session.get(f"/is_all_done/{self._interface.encoded_chat_id}") as response_:
-                    if await response_.text() == "1":
-                        scheduler.remove_job(job_id=self._interface.chat_id)
-
-                await self._interface.update_feedback(f'{Emoji.DENIAL} Target with name {self._interface.storage["targets"][target_id]["name"]} deleted')
+                await self._interface.update_feedback(
+                    f'{Emoji.DENIAL} Target with name {self._interface.storage["targets"][target_id]["name"]} deleted')
                 await self._interface.targets_manager.targets.open()
-
             elif response.status == 401:
                 await self._interface.close_session()
             else:
                 await self._interface.handling_unexpected_error(response)
+
+            async with self._interface.session.get(f"/is_all_done/{await self._interface.encoded_chat_id()}") as response:
+                if response.status == 200:
+                    if await response.text() == "1":
+                        await self._interface.notification_off()
+                    else:
+                        await self._interface.notification_on()
+                elif response.status == 401:
+                    await self._interface.close_session()
+                else:
+                    self._interface.handling_unexpected_error(response)
+
+
+
 
 
 class InputTargetName(TextMarkup):
@@ -232,13 +242,13 @@ class Targets(TextMarkup):
 
                 total_completed = 0
                 total_targets = len(targets_)
-
+                markup_map = MarkupMap()
                 for i, target in enumerate(targets_):
                     if target["completed"]:
                         total_completed += 1
-                        await self.markup_map.add_buttons(
+                        await markup_map.add_buttons(
                             {
-                                target.id: ButtonWidget(
+                                target["id"]: ButtonWidget(
                                     text=target["name"],
                                     callback_data=ShowTargetCallbackData(id=target["id"]),
                                     mark=Emoji.OK
@@ -246,15 +256,21 @@ class Targets(TextMarkup):
                             }
                         )
                     else:
-                        await self.markup_map.add_buttons(
+                        await markup_map.add_buttons(
                             {
-                                target.id: ButtonWidget(
+                                target["id"]: ButtonWidget(
                                     text=target["name"],
                                     callback_data=ShowTargetCallbackData(id=target["id"]),
                                 ),
                             }
                         )
 
+                await markup_map.add_buttons(
+                    {
+                        "back": ButtonWidget(text=f"{Emoji.BACK} Back", callback_data="targets_control")
+                    }
+                )
+                self.markup_map = markup_map
                 self.text_map['info'].data = f'{total_completed}/{total_targets}'
                 await super().open()
             elif response.status == 401:
@@ -272,61 +288,67 @@ class Target(TextMarkup):
                     "name": DataTextWidget(header=f'{Emoji.DART} Name'),
                     "description": DataTextWidget(header=f'{Emoji.LIST_WITH_PENCIL} Description'),
                     "percent_progress": DataTextWidget(header=f'{Emoji.TROPHY} Progress'),
-                    "completed": DataTextWidget(header='Completed'),
+                    "completed": DataTextWidget(header=f'{Emoji.INFO} Completed'),
                 }
             ),
             MarkupMap(
                 [
                     {
-                        "update_name": ButtonWidget(text=f'{Emoji.NEW} Update name', callback_data="update_target_name"),
-                        "update_description": ButtonWidget(text=f'{Emoji.NEW} Update description', callback_data="update_target_description"),
+                        "update_name": ButtonWidget(text=f'{Emoji.UP} Update name', callback_data="update_target_name"),
+                        "update_description": ButtonWidget(text=f'{Emoji.UP} Update description', callback_data="update_target_description"),
+                    },
+                    {
                         "delete_target": ButtonWidget(text=f'{Emoji.DENIAL} Delete', callback_data="conform_delete_target"),
                         "completed": ButtonWidget(callback_data="invert_completed")
                     },
                     {
-                        "back": ButtonWidget(text=f"{Emoji.BACK}", callback_data="targets")
+                        "back": ButtonWidget(text=f"{Emoji.BACK} Back", callback_data="targets")
                     }
                 ]
             )
         )
 
     async def open(self, **kwargs):
-        self._interface.targets_manager.current_target_id = kwargs["target_id"]
+        storage.set(f"target_id:{self._interface.chat_id}", kwargs["target_id"])
         async with (self._interface.session.get(f"/target/{kwargs['target_id']}") as response):
             target = await response.json()
-
         self.text_map['name'].data = target["name"]
 
-        if target.description is None:
+        if target["description"] is None:
             self.text_map['description'].off()
         else:
+            self.text_map['description'].on()
             self.text_map['description'].data = target["description"]
 
-        percent_progress = round(target['progress'] / target['border'] * 100)
+        percent_progress = round(target['progress'] / target['border_progress'] * 100)
         quantity_green_squares = round(percent_progress / 100 * 10)
         view_progress = Emoji.GREEN_BIG_SQUARE * quantity_green_squares + Emoji.GREY_BUG_SQUARE * (10 - quantity_green_squares)
         self.text_map["percent_progress"].data = f"{percent_progress}% {view_progress}"
 
-        self.text_map['completed'].data = Emoji.OK if target.completed else Emoji.DENIAL
+        self.text_map['completed'].data = Emoji.OK if target["completed"] else Emoji.DENIAL
 
-        self.markup_map["completed"].text = f'{Emoji.DENIAL} Incomplete' if target.completed else f'{Emoji.OK} Complete'
+        self.markup_map["completed"].text = f'{Emoji.DENIAL} Incomplete' if target["completed"] else f'{Emoji.OK} Complete'
 
         await super().open()
 
     async def invert_complete(self):
-        target_id = self._interface.targets_manager.current_target_id
+        target_id = storage.get(f"target_id:{self._interface.chat_id}")
         async with self._interface.session.patch(f'/invert_target_completed/{target_id}') as response:
             if response.status == 200:
                 response = await response.text()
                 self.markup_map['completed'].text = f'{Emoji.DENIAL} Incomplete' if response == '1' else f'{Emoji.OK} Complete'
-                self._interface.storage["targets"][target_id]["completed"] = True if response == '1' else False
                 await self.open(target_id=target_id)
 
-                async with self._interface.session.get("/is_all_done") as response_:
-                    if await response_.text() == "1":
-                        scheduler.remove_job(job_id=self._interface.chat_id)
-                    elif response_.status == 401:
+                async with self._interface.session.get(f"/is_all_done/{await self._interface.encoded_chat_id()}") as response:
+                    if response.status == 200:
+                        if await response.text() == "1":
+                            await self._interface.notification_off()
+                        else:
+                            await self._interface.notification_on()
+                    elif response.status == 401:
                         await self._interface.close_session()
+                    else:
+                        await self._interface.handling_unexpected_error(response)
             elif response.status == 401:
                 await self._interface.close_session()
             else:
@@ -345,7 +367,7 @@ class UpdateTargetName(TextMarkup):
             MarkupMap(
                 [
                     {
-                        "back": ButtonWidget(text=f"{Emoji.DENIAL} Cancel")
+                        "back": ButtonWidget(text=f"{Emoji.DENIAL} Cancel", callback_data="targets_control")
                     }
                 ]
             ),
@@ -353,7 +375,7 @@ class UpdateTargetName(TextMarkup):
         )
 
     async def __call__(self, name: str):
-        target_id = self._interface.targets_manager.current_target_id
+        target_id = storage.get(f"target_id:{self._interface.chat_id}")
         if len(name) > MAX_NAME_LENGTH:
             await self._interface.update_feedback(f"Maximum name length is {MAX_NAME_LENGTH} simbols")
             await self.open()
@@ -390,18 +412,16 @@ class UpdateTargetDescription(TextMarkup):
         )
 
     async def __call__(self, description: str):
-        target_id = self._interface.targets_manager.current_target_id
+        target_id = storage.get(f"target_id:{self._interface.chat_id}")
         if len(description) > MAX_DESCRIPTION_LENGTH:
             await self._interface.update_feedback(f"Maximum description length is {MAX_DESCRIPTION_LENGTH} simbols")
             await self.open()
-        elif not re.fullmatch(r'[\w\s]+', description, flags=re.I):
-            await self._interface.update_feedback(f"Description must contains only latin symbols or _ or spaces or digits")
+        elif not re.fullmatch(r'[\w\s,?!:.]+', description, flags=re.I):
+            await self._interface.update_feedback(f"Description must contains only latin symbols or _ or , or ? or ! or : or . or spaces or digits", type_="error")
             await self.open()
         else:
             async with self._interface.session.patch(f'/update_target_description/{target_id}?description={description}') as response:
                 if response.status == 200:
-                    self._interface.targets_manager.target["description"].on()
-                    self._interface.storage["targets"][target_id]['description'] = description
                     await self._interface.targets_manager.target.open(target_id=target_id)
                 elif response.status == 401:
                     await self._interface.close_session()
@@ -433,7 +453,7 @@ class ShowCompletedTargetCallbackData(CallbackData, prefix="show_completed_targe
     id: int
 
 
-class ShowCompletedTargets(TextMarkup):
+class CompletedTargets(TextMarkup):
     def __init__(self, interface):
         super().__init__(
             interface,
@@ -448,9 +468,14 @@ class ShowCompletedTargets(TextMarkup):
         async with self._interface.session.get('/completed_targets') as response:
             if response.status == 200:
                 targets = await response.json()
+                if not targets:
+                    await self._interface.update_feedback("no completed targets so far", type_="info")
+                    await self._interface.targets_manager.targets_control.open()
+                    return
                 self.text_map["info"].data = len(targets)
+                markup_map = MarkupMap()
                 for target in targets:
-                    await self.markup_map.add_buttons(
+                    await markup_map.add_buttons(
                         {
                             "name": ButtonWidget(
                                 text=target["name"],
@@ -458,10 +483,13 @@ class ShowCompletedTargets(TextMarkup):
                             )
                         }
                     )
+                await markup_map.add_buttons(
+                    {
+                        "back": ButtonWidget(text=f"{Emoji.BACK} Back", callback_data="targets_control")
+                    }
+                )
+                self.markup_map = markup_map
                 await super().open()
-            elif response.status == 404:
-                await self._interface.update_feedback("no completed targets so far")
-                await self._interface.targets_manager.targets_control.open()
             elif response.status == 401:
                 await self._interface.close_session()
             else:
@@ -493,7 +521,7 @@ class CompletedTarget(TextMarkup):
         )
 
     async def open(self, **kwargs):
-        self._interface.targets_manager.current_target_id = kwargs["target_id"]
+        storage.set(f"target_id:{self._interface.chat_id}", kwargs["target_id"])
         async with self._interface.session.get(f"/target/{kwargs['target_id']}") as response:
             target = await response.json()
 

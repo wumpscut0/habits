@@ -152,6 +152,7 @@ async def targets(Authorization: Annotated[str, Header()]):
         print(t)
         return t
 
+
 @app.get("/completed_targets")
 async def get_completed_targets(Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
@@ -163,7 +164,7 @@ async def get_completed_targets(Authorization: Annotated[str, Header()]):
 async def get_target(target_id: int, Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
         await AuthQueries.authentication(session, Authorization)
-        return TargetsQueries.get_target(session, target_id)
+        return await TargetsQueries.get_target(session, target_id)
 
 
 @app.post('/create_target')

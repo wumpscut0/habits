@@ -77,19 +77,24 @@ class TitleScreen(TextMarkup):
     async def invert_notifications(self):
         token = await encode_jwt({"telegram_id": self._interface.chat_id})
         async with self._interface.session.patch(f'/invert_notifications/{token}') as response:
-            content = await response.text()
-        if content == '1':
-            self.markup_map["notifications"].mark = Emoji.BELL
-            async with self._interface.session.get(f"/is_all_done/{await self._interface.encoded_chat_id()}") as response_:
-                if await response_.text() == "0":
-                    await self._interface.notification_on()
-            await self.open()
-        elif content == '0':
-            await self._interface.notification_off()
-            self.markup_map["notifications"].mark = Emoji.NOT_BELL
-            await self.open()
-        else:
-            await self._interface.handling_unexpected_error(response)
+            if response.status == 200:
+                response = await response.text()
+                if response == '1':
+                    self.markup_map["notifications"].mark = Emoji.BELL
+                    async with self._interface.session.get(f"/is_all_done/{await self._interface.encoded_chat_id()}") as response_:
+                        if await response_.text() == "0":
+                            await self._interface.notification_on()
+                        else:
+                            await self._interface.notification_off()
+                    await self.open()
+                else:
+                    await self._interface.notification_off()
+                    self.markup_map["notifications"].mark = Emoji.NOT_BELL
+                    await self.open()
+            elif response.status == 401:
+                await self._interface.close_session()
+            else:
+                await self._interface.handling_unexpected_error(response)
 
 
 class Profile(TextMarkup):
@@ -262,14 +267,22 @@ class Options(TextMarkup):
         async with self._interface.session.patch('/notification_time', json={"hour": hour, "minute": minute}) as response:
             if response.status == 200:
                 self.text_map["notification_time"].data = f"{hour}:{minute}"
-                await self._interface.update_notification_time()
                 await self.open()
             elif response.status == 401:
                 await self._interface.close_session()
             else:
                 await self._interface.handling_unexpected_error(response)
-        
-        storage.delete(f"hour:{self._interface.chat_id}", f"minute:{self._interface.chat_id}")
+
+        async with self._interface.session.get(f"/is_all_done/{await self._interface.encoded_chat_id()}") as response:
+            if response.status == 200:
+                if await response.text() == "1":
+                    await self._interface.notification_off()
+                else:
+                    await self._interface.notification_on()
+            elif response.status == 401:
+                await self._interface.close_session()
+            else:
+                await self._interface.handling_unexpected_error(response)
 
 
 class InputPassword(TextMarkup):
