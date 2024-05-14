@@ -1,19 +1,15 @@
 import os
 
-import pytz
-from pytz import utc
-
 import aiohttp
-import jwt
+
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.formatting import Bold
 from aiogram.types.inline_keyboard_markup import InlineKeyboardMarkup
-from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.redis import RedisJobStore
 
 from frontend.bot import bot
-from frontend.utils import config, Emoji, get_service_key
+from frontend.utils import config, Emoji
 from frontend.utils.loggers import info
 
 remainder_text = Bold('Don`t forget mark done target today').as_html()
@@ -47,8 +43,7 @@ jobstores = {
 }
 
 scheduler = AsyncIOScheduler()
-# pytz.timezone('Asia/Novosibirsk')
 scheduler.configure(jobstores=jobstores)
 
-scheduler.add_job(increase_progress, 'cron', hour=0, replace_existing=True, id="increase_progress")
+scheduler.add_job(increase_progress, 'cron', hour=14, minute=15, replace_existing=True, id="increase_progress")
 

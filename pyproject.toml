@@ -19,6 +19,8 @@ zxcvbn-python = "^4.4.24"
 asyncpg = "^0.29.0"
 uvicorn = "^0.29.0"
 aiosmtplib = "^3.0.1"
+cryptography = "^42.0.7"
+pydantic-async-validation = "^0.1.4"
 
 
 [build-system]

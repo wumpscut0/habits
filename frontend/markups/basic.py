@@ -8,7 +8,7 @@ from zxcvbn import zxcvbn
 from frontend.bot.FSM import States
 from frontend.markups.core import TextMarkup, TextMap, TextWidget, MarkupMap, ButtonWidget, DataTextWidget
 
-from frontend.utils import Emoji, config, encode_jwt, storage
+from frontend.utils import Emoji, config, storage
 from frontend.utils.mailing import Mailing
 
 MAX_EMAIL_LENGTH = config.getint('limitations', 'MAX_EMAIL_LENGTH')
@@ -426,7 +426,7 @@ class InputEmail(TextMarkup):
         if len(email) > MAX_EMAIL_LENGTH:
             await self._interface.update_feedback(f'Max email length is {MAX_EMAIL_LENGTH} symbols.')
             await self.open()
-        elif not re.fullmatch(r'\w+@\w+\.\w+', email, flags=re.I):
+        elif not re.fullmatch(r'[a-zA-Z0-9]+@[a-zA-Z]+\.[a-zA-Z]', email, flags=re.I):
             await self._interface.update_feedback('Allowable format is example@email.com', type_="error")
             await self.open()
         else:

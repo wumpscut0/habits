@@ -1,7 +1,9 @@
+import re
 from typing import Optional
 
 from fastapi import HTTPException
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
+from pydantic_async_validation.validators import async_field_validator
 
 from backend.utils import config
 
@@ -13,53 +15,58 @@ MIN_BORDER_RANGE = config.getint('limitations', "MIN_BORDER_RANGE")
 MAX_BORDER_RANGE = config.getint('limitations', "MAX_BORDER_RANGE")
 
 
-class TelegramIdApiModel(BaseModel):
-    telegram_id: int
+class UserIdApiModel(BaseModel):
+    user_id: int
 
 
-class AuthApiModel(BaseModel):
-    telegram_id: int
-    password: Optional[str] = None
-
-    @field_validator('password', mode='before')
+class PasswordApiModel(BaseModel):
+    password: str
+    @async_field_validator('password', mode='after')
     @classmethod
-    def password_validate(cls, password):
-        if password is not None:
-            if len(password) > MAX_PASSWORD_LENGTH:
-                raise HTTPException(
-                    400,
-                    detail=f'Maximum password length is {MAX_PASSWORD_LENGTH}'
-                )
+    async def password_validate(cls, password):
+        if len(password) > MAX_PASSWORD_LENGTH:
+            raise HTTPException(
+                400,
+                detail=f'Maximum password length is {MAX_PASSWORD_LENGTH}'
+            )
         return password
 
 
-class UpdatePasswordApiModel(BaseModel):
-    telegram_id: int
-    hash: str
-
-
-class UpdateEmailApiModel(BaseModel):
-    email: str | None = None
-
-    @field_validator('email', mode='before')
+class EmailApiModel(BaseModel):
+    email: str
+    @async_field_validator('email', mode='after')
     @classmethod
-    def email_validate(cls, email):
+    async def email_validate(cls, email):
         if len(email) > MAX_EMAIL_LENGTH:
             raise HTTPException(
                 400,
                 detail=f'Maximum email length is {MAX_EMAIL_LENGTH}'
             )
+        if not re.fullmatch(r'[a-zA-Z0-9]+@[a-zA-Z]+\.[a-zA-Z]', email):
+            raise HTTPException(
+                400,
+                detail=f'Invalid email format'
+            )
         return email
+
+
+class AuthApiModel(BaseModel):
+    user_id: UserIdApiModel
+    password: Optional[PasswordApiModel] = None
+
+
+class UpdatePasswordApiModel(BaseModel):
+    user_id: UserIdApiModel
+    hash_: str
 
 
 class TargetApiModel(BaseModel):
     name: str
     border_progress: int | None = None
     description: str | None = None
-
-    @field_validator("name", mode="before")
+    @async_field_validator("name", mode="before")
     @classmethod
-    def name_validate(cls, name):
+    async def name_validate(cls, name):
         if len(name) > MAX_NAME_LENGTH:
             raise HTTPException(
                 400,
@@ -67,9 +74,9 @@ class TargetApiModel(BaseModel):
             )
         return name
 
-    @field_validator('border_progress', mode='before')
+    @async_field_validator('border_progress', mode='before')
     @classmethod
-    def border_validate(cls, border_progress):
+    async def border_validate(cls, border_progress):
         if border_progress is not None:
             if not MIN_BORDER_RANGE <= border_progress <= MAX_BORDER_RANGE:
                 raise HTTPException(
@@ -78,9 +85,9 @@ class TargetApiModel(BaseModel):
                 )
         return border_progress
 
-    @field_validator('description', mode='before')
+    @async_field_validator('description', mode='before')
     @classmethod
-    def description_validate(cls, description):
+    async def description_validate(cls, description):
         if description is not None:
             if len(description) > MAX_DESCRIPTION_LENGTH:
                 raise HTTPException(
@@ -94,9 +101,9 @@ class NotificationTimeApiModel(BaseModel):
     hour: int
     minute: int
 
-    @field_validator('hour', mode="before")
+    @async_field_validator('hour', mode="before")
     @classmethod
-    def hour_validate(cls, hour):
+    async def hour_validate(cls, hour):
         if not 0 <= hour <= 23:
             raise HTTPException(
                 400,
@@ -104,9 +111,9 @@ class NotificationTimeApiModel(BaseModel):
             )
         return hour
 
-    @field_validator('minute', mode="before")
+    @async_field_validator('minute', mode="before")
     @classmethod
-    def minute_validate(cls, minute):
+    async def minute_validate(cls, minute):
         if not 0 <= minute <= 59:
             raise HTTPException(
                 400,

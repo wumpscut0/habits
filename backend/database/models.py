@@ -1,7 +1,7 @@
 import pytz
-from datetime import time, datetime, UTC
+from datetime import time, datetime
 
-from sqlalchemy import *
+from sqlalchemy import Column, BIGINT, String, VARCHAR, Boolean, Time, Integer, DateTime, ForeignKey
 from sqlalchemy.orm import DeclarativeBase, relationship
 
 from backend.utils import config
@@ -16,19 +16,23 @@ class Base(DeclarativeBase):
     ...
 
 
-class UserORM(Base):
+class AsDictMixin:
+    def as_dict_(self):
+        return {column.name: getattr(self, column.name) for column in self.__table__.columns}
+
+
+class UserORM(Base, AsDictMixin):
     __tablename__ = 'user'
-    telegram_id = Column(BIGINT, primary_key=True, autoincrement=False, nullable=False)
+    id = Column(BIGINT, primary_key=True, autoincrement=False, nullable=False)
     hash = Column(String, nullable=True)
     email = Column(VARCHAR(MAX_EMAIL_LENGTH), nullable=True, unique=True)
     notifications = Column(Boolean, default=True)
     notification_time = Column(Time, default=time(DEFAULT_REMAINING_HOUR, 0, tzinfo=pytz.utc))
-    # target_id = Column(Integer, ForeignKey('target.id'))
 
     targets = relationship('TargetORM')
 
 
-class TargetORM(Base):
+class TargetORM(Base, AsDictMixin):
     __tablename__ = 'target'
     id = Column(Integer, primary_key=True)
     create_datetime = Column(DateTime, default=datetime.now())
@@ -40,7 +44,4 @@ class TargetORM(Base):
     progress = Column(Integer, default=0)
     border_progress = Column(Integer, default=21)
 
-    user_id = Column(BIGINT, ForeignKey('user.telegram_id'), nullable=False)
-
-    def as_dict_(self):
-        return {column.name: getattr(self, column.name) for column in self.__table__.columns}
+    user_id = Column(BIGINT, ForeignKey('user.id'), nullable=False)

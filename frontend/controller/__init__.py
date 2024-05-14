@@ -12,11 +12,14 @@ from frontend.bot import bot
 from frontend.markups.basic import BasicManager
 from frontend.markups.core import TextMarkup, DataTextWidget
 from frontend.markups.targets import TargetsManager
-from frontend.utils import SerializableMixin, Emoji, encode_jwt, storage
+from frontend.utils import SerializableMixin, Emoji, storage
 from frontend.utils.loggers import errors, info
 from frontend.utils.scheduler import scheduler, remainder
+
+
 async def test():
     print('!!!!!!!!')
+
 
 class Interface(SerializableMixin):
     _feedback_headers = {
@@ -25,11 +28,10 @@ class Interface(SerializableMixin):
         "error": f"{Emoji.DENIAL} Error"
     }
 
-    def __init__(self, chat_id: int, first_name: str):
+    def __init__(self, chat_id: int):
         self.basic_manager = BasicManager(self)
         self.targets_manager = TargetsManager(self)
 
-        self.first_name = first_name
         self.chat_id = chat_id
         self.token = None
         self.feedback = DataTextWidget(active=False)

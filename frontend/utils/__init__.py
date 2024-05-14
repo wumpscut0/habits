@@ -112,11 +112,6 @@ config = ConfigParser()
 config.read(os.path.abspath(os.path.join(os.path.dirname(__file__), "config.ini")))
 
 
-async def get_service_key():
-    return jwt.encode({"password": os.getenv('SERVICES_PASSWORD')}, os.getenv('JWT'))
 
-
-async def encode_jwt(payload: Dict):
-    return jwt.encode(payload, os.getenv('JWT'))
 
 
