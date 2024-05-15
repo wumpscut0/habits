@@ -1,12 +1,11 @@
-from typing import Literal
+import os
+from typing import Literal, Iterable
 
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.fsm.context import FSMContext
-from aiohttp import ClientSession, ContentTypeError
-from aiohttp.web_response import Response
+from aiohttp import ContentTypeError
 from apscheduler.jobstores.base import JobLookupError
 from apscheduler.triggers.cron import CronTrigger
-from pydantic import ValidationError
+from cryptography.fernet import Fernet
 
 from frontend.bot import bot
 from frontend.markups.basic import BasicManager
@@ -17,16 +16,13 @@ from frontend.utils.loggers import errors, info
 from frontend.utils.scheduler import scheduler, remainder
 
 
-async def test():
-    print('!!!!!!!!')
-
-
 class Interface(SerializableMixin):
     _feedback_headers = {
         "default": f'{Emoji.REPORT} Feedback',
         "info": f"{Emoji.INFO} Info",
         "error": f"{Emoji.DENIAL} Error"
     }
+    _cipher = Fernet(os.getenv("CIPHER"))
 
     def __init__(self, chat_id: int):
         self.basic_manager = BasicManager(self)
@@ -40,44 +36,23 @@ class Interface(SerializableMixin):
         self.session = None
 
         self._current_markup = None
-        self._trash = []
 
-    async def reset_session(self, close_msg='Session close'):
+    async def open_session(self, close_msg='Session close'):
+        await self.close_session(close_msg)
+        await self.basic_manager.title_screen.open(new_session=True)
+
+    async def close_session(self, close_msg="Session close"):
         await self._reset_state()
-        message_id = storage.get(f"{self.chat_id}")
+        message_id = storage.get(str(self.chat_id))
         try:
             message = await bot.edit_message_text(
                 chat_id=self.chat_id,
                 message_id=message_id,
                 text=close_msg
             )
-            self._trash.append(message.message_id)
+            await self.refill_trash(message.message_id)
         except TelegramBadRequest:
             pass
-
-        async with self.session.get(f'/notification_is_on/{await encode_jwt({"telegram_id": self.chat_id})}') as response:
-            response_ = await response.text()
-            if response_ == '1':
-                self.basic_manager.title_screen.markup_map["notifications"].mark = Emoji.BELL
-            elif response_ == '0':
-                self.basic_manager.title_screen.markup_map["notifications"].mark = Emoji.NOT_BELL
-            else:
-                self.basic_manager.title_screen.markup_map["notifications"].mark = Emoji.RED_QUESTION
-                errors.error(f'Unsuccessfully check notification, return code: {response.status}')
-
-        message = await bot.send_message(
-            chat_id=self.chat_id,
-            text=await self.basic_manager.title_screen.text,
-            reply_markup=await self.basic_manager.title_screen.markup
-        )
-
-        storage.set(f"{self.chat_id}", message.message_id)
-
-        await self.update_interface_in_redis()
-
-    async def close_session(self):
-        await self._reset_state()
-        await self.basic_manager.title_screen.open()
 
     async def clear(self):
         message_id = storage.get(f"{self.chat_id}")
@@ -85,11 +60,6 @@ class Interface(SerializableMixin):
             await bot.delete_message(chat_id=self.chat_id, message_id=message_id)
         await self.clean_trash()
         await self.state.clear()
-
-    # async def clear_v2(self):
-    #     interface = Interface(self.chat_id, self.first_name)
-    #     interface.state = self.state
-    #     self.state.clear()
 
     async def update(self, markup: TextMarkup):
         self._current_markup = markup
@@ -117,7 +87,8 @@ class Interface(SerializableMixin):
             self.feedback.on()
 
     async def clean_trash(self):
-        for message_id in self._trash:
+        trash = storage.get(f"trash:{self.chat_id}")
+        for message_id in trash:
             try:
                 await bot.delete_message(self.chat_id, message_id)
             except TelegramBadRequest:
@@ -125,10 +96,12 @@ class Interface(SerializableMixin):
                     await bot.edit_message_text('deleted', self.chat_id, message_id)
                 except TelegramBadRequest:
                     pass
-        self._trash = []
+        storage.delete(f"trash:{self.chat_id}")
 
     async def refill_trash(self, message_id: int):
-        self._trash.append(message_id)
+        trash = storage.get(f"trash:{self.chat_id}")
+        trash.append(message_id)
+        storage.set(f"trash:{self.chat_id}")
 
     async def handling_unexpected_error(self, response):
         await self.update_feedback('internal server error', type_="error")
@@ -144,37 +117,29 @@ class Interface(SerializableMixin):
         except (ContentTypeError, Exception):
             errors.error("internal server error")
 
-    async def encoded_chat_id(self):
-        return await encode_jwt({'telegram_id': self.chat_id})
-
-    async def notification_on(self):
-        async with self.session.get(f'/notification_time/{await self.encoded_chat_id()}') as response:
-            if response.status == 200:
-                time_ = await response.json()
+    async def refresh_notifications(self):
+        user_response = await self.get_user()
+        targets_response = await self.get_targets()
+        if user_response is not None and targets_response is not None:
+            user = (await user_response.json())
+            targets = (await targets_response.json())
+            all_done = True
+            for target in targets:
+                if not target["completed"]:
+                    all_done = False
+                    break
+            if user["notifications"] and not all_done:
+                time_ = user["notification_time"]
                 scheduler.add_job(
                     func=remainder,
                     trigger=CronTrigger(hour=time_["hour"], minute=time_["minute"]),
                     args=(self.chat_id,), replace_existing=True, id=str(self.chat_id)
                 )
-
-    async def notification_off(self):
-        try:
-            scheduler.remove_job(job_id=self.chat_id, jobstore='default')
-        except JobLookupError:
-            pass
-            # info.warning(f'With try to delete job, it was not found for user: {self.chat_id}')
-
-    async def update_notification_time(self):
-        await self.notification_off()
-
-        hour = storage.get(f"hour:{self.chat_id}")
-        minute = storage.get(f"minute:{self.chat_id}")
-        print(hour, minute)
-        try:
-            job = scheduler.a(str(self.chat_id), "default", trigger=CronTrigger(hour=hour, minute=minute))
-            info.info(f'Job with id {self.chat_id} modified {job.next_run_time}')
-        except JobLookupError:
-            pass
+            else:
+                try:
+                    scheduler.remove_job(job_id=self.chat_id, jobstore='default')
+                except JobLookupError:
+                    pass
 
     async def update_interface_in_redis(self):
         state = self.state
@@ -192,8 +157,36 @@ class Interface(SerializableMixin):
         except TelegramBadRequest:
             pass
 
+    async def get_user(self):
+        async with self.session.get(
+                f'/users/{self._cipher.encrypt(bytes(self.chat_id))}',
+                headers={"Authorization": storage.get("service_key")}
+        ) as response:
+            return await self.response_middleware(response)
+
+    async def get_targets(self):
+        async with self.session.get(
+                f'/targets',
+                headers={"Authorization": self.token}
+        ) as response:
+            return await self.response_middleware(response)
+
+    async def response_middleware(self, response, *args: int):
+        """
+        :param args: is expected response codes
+        :return: None if response code not in args
+        """
+        if response.status in args:
+            return response
+        elif response.status == 401:
+            await self.close_session()
+        else:
+            await self.handling_unexpected_error(response)
+
     async def _reset_state(self):
         await self.state.set_state(None)
         self.token = None
+
+
 
 

@@ -11,7 +11,7 @@ from backend.database.queries import PasswordQueries, EmailQueries, Notification
 from backend.routers import app, Authority
 
 
-@app.post("/users")
+@app.post("/users", status_code=201)
 async def registration(user_id_api_model: UserIdApiModel, Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
         await Authority.service_authentication(Authorization)
@@ -38,7 +38,7 @@ async def get_user(user_id: str, Authorization: Annotated[str, Header()]):
 
 
 @app.get('/users')
-async def get_user(Authorization: Annotated[str, Header()]):
+async def get_users(Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
         await Authority.service_authentication(Authorization)
         return await UserQueries.get_users(session)
@@ -72,14 +72,14 @@ async def delete_email(Authorization: Annotated[str, Header()]):
         await EmailQueries.delete(session, user.user_id)
 
 
-@app.patch("/users/notifications/invert")
+@app.patch("/users/notifications")
 async def invert_notifications(user_id_api_model: UserIdApiModel, Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
         await Authority.service_authentication(Authorization)
         await NotificationsQueries.invert(session, user_id_api_model.user_id)
 
 
-@app.put("/users/notification/time")
+@app.put("/users/notification")
 async def change_notification_time(time_: NotificationTimeApiModel, Authorization: Annotated[str, Header()]):
     async with Session.begin() as session:
         user = await Authority.user_authentication(Authorization)

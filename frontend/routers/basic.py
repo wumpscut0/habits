@@ -1,9 +1,8 @@
-from aiohttp import ClientSession
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
 from aiogram.types import CallbackQuery
 from aiogram import Router, F
 from aiogram.filters import StateFilter
-from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from frontend.markups.basic import NotificationMinuteCallbackData, NotificationHourCallbackData
@@ -15,16 +14,16 @@ basic_router = Router()
 
 @basic_router.message(CommandStart())
 async def open_tittle_screen(message: Message, interface: Interface):
-    await interface.reset_session()
+    await interface.open_session()
     await message.delete()
 
 
 @basic_router.callback_query(F.data == 'title_screen')
 async def open_tittle_screen(callback: CallbackQuery, interface: Interface):
-    await interface.close_session()
+    await interface.basic_manager.title_screen.open()
 
 
-@basic_router.callback_query(F.data == 'invert notifications')
+@basic_router.callback_query(F.data == 'invert_notifications')
 async def invert_notifications(callback: CallbackQuery, interface: Interface):
     await interface.basic_manager.title_screen.invert_notifications()
 
@@ -138,3 +137,11 @@ async def change_notification_time(callback: CallbackQuery, callback_data: Notif
 @basic_router.callback_query(NotificationMinuteCallbackData.filter())
 async def change_notification_time(callback: CallbackQuery, callback_data: NotificationMinuteCallbackData, interface: Interface):
     await interface.basic_manager.change_notification_minute(callback_data.minute)
+
+
+@basic_router.callback_query(F.data == "close_notification")
+async def close_notification(callback: CallbackQuery):
+    try:
+        await callback.message.delete()
+    except TelegramBadRequest:
+        await callback.message.edit_text("Deleted")

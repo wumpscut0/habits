@@ -4,7 +4,7 @@ from aiogram.filters.callback_data import CallbackData
 from passlib.handlers.pbkdf2 import pbkdf2_sha256
 from zxcvbn import zxcvbn
 
-
+from frontend.bot import bot
 from frontend.bot.FSM import States
 from frontend.markups.core import TextMarkup, TextMap, TextWidget, MarkupMap, ButtonWidget, DataTextWidget
 
@@ -64,37 +64,53 @@ class TitleScreen(TextMarkup):
             )
         )
 
-    async def authorization(self):
-        async with self._interface.session.post('/sign_in', json={'telegram_id': self._interface.chat_id}) as response:
-            if response.status == 401:
-                await self._interface.basic_manager.authorization_with_password.open()
-            elif response.status == 200:
-                self._interface.token = await response.text()
-                await self._interface.basic_manager.profile.open()
+    async def open(self, **kwargs):
+        response = await self._interface.get_user()
+
+        if response is not None:
+            user = await response.json()
+            if user["notification"]:
+                self.markup_map["notifications"].mark = Emoji.BELL
             else:
-                await self._interface.handling_unexpected_error(response)
+                self.markup_map["notifications"].mark = Emoji.NOT_BELL
+        else:
+            self.markup_map["notifications"].mark = Emoji.RED_QUESTION
+
+        if kwargs.get('new_session'):
+            user_id = self._interface.chat_id
+            message = await bot.send_message(
+                chat_id=user_id,
+                text=await self.text,
+                reply_markup=await self.markup
+            )
+
+            storage.set(str(user_id), message.message_id)
+            self._interface.update_interface_in_redis()
+        else:
+            await super().open()
+
+    async def authorization(self):
+        response = await self._interface.get_user()
+        if response is not None:
+            hash_ = (await response.json())["hash"]
+            if hash_ is not None:
+                await self._interface.basic_manager.authorization_with_password.open()
+            else:
+                async with self._interface.session.post('/users/login', json={
+                    'user_id': self._interface.chat_id,
+                }, headers={"Authorization": storage.get("service_key")}) as response:
+                    response = await self._interface.response_middleware(response)
+                    if response is not None:
+                        self._interface.token = await response.text()
+                        await self._interface.basic_manager.profile.open()
 
     async def invert_notifications(self):
-        token = await encode_jwt({"telegram_id": self._interface.chat_id})
-        async with self._interface.session.patch(f'/invert_notifications/{token}') as response:
-            if response.status == 200:
-                response = await response.text()
-                if response == '1':
-                    self.markup_map["notifications"].mark = Emoji.BELL
-                    async with self._interface.session.get(f"/is_all_done/{await self._interface.encoded_chat_id()}") as response_:
-                        if await response_.text() == "0":
-                            await self._interface.notification_on()
-                        else:
-                            await self._interface.notification_off()
-                    await self.open()
-                else:
-                    await self._interface.notification_off()
-                    self.markup_map["notifications"].mark = Emoji.NOT_BELL
-                    await self.open()
-            elif response.status == 401:
-                await self._interface.close_session()
-            else:
-                await self._interface.handling_unexpected_error(response)
+        async with self._interface.session.patch(
+                "/users/notifications/invert",
+                json={"user_id": self._interface.chat_id},
+                headers={"Authorization": storage.get("service_key")}
+        ) as response:
+            await self._interface.response_middleware(response)
 
 
 class Profile(TextMarkup):
@@ -122,7 +138,7 @@ class Profile(TextMarkup):
         )
 
     async def open(self):
-        self.text_map['hello'].data = self._interface.first_name
+        storage.get(f"first_name:{self._interface.chat_id}")
         await super().open()
 
 
@@ -174,115 +190,93 @@ class Options(TextMarkup):
         )
 
     async def open(self):
-        async with self._interface.session.get(f'/notification_time/{await self._interface.encoded_chat_id()}') as response:
-            if response.status == 200:
-                time_ = await response.json()
-                minute = str(time_['minute'])
-                minute = "0" + minute if len(minute) < 2 else minute
-                self.text_map["notification_time"].data = f"{time_['hour']}:{minute}"
-            else:
-                await self._interface.handling_unexpected_error(response)
-                return
+        response = await self._interface.get_user()
+        if response is not None:
+            user = await response.json()
+            time_ = user["notifications_time"]
+            minute = str(time_['minute'])
+            minute = "0" + minute if len(minute) < 2 else minute
+            self.text_map["notification_time"].data = f"{time_['hour']}:{minute}"
 
-        async with self._interface.session.get(f"/is_password_set/{await self._interface.encoded_chat_id()}") as response:
-            if response.status == 200:
-                response = await response.text()
-                if response == '1':
-                    self.markup_map['delete_password'].on()
-                    self.markup_map['input_password'].text = f'{Emoji.KEY + Emoji.UP} Change password'
-                else:
-                    self.markup_map['delete_password'].off()
-                    self.markup_map["input_password"].text = f"{Emoji.KEY + Emoji.PLUS} Add password"
+            if user["hash"]:
+                self.markup_map['delete_password'].on()
+                self.markup_map['input_password'].text = f'{Emoji.KEY + Emoji.UP} Change password'
             else:
-                await self._interface.handling_unexpected_error(response)
-                return
+                self.markup_map['delete_password'].off()
+                self.markup_map["input_password"].text = f"{Emoji.KEY + Emoji.PLUS} Add password"
 
-        async with self._interface.session.get(f"/is_email_set/{await self._interface.encoded_chat_id()}") as response:
-            if response.status == 200:
-                response = await response.text()
-                if response == '1':
-                    self.markup_map['delete_email'].on()
-                    self.markup_map['input_email'].text = f'{Emoji.ENVELOPE + Emoji.UP} Change email'
-                else:
-                    self.markup_map['delete_email'].off()
-                    self.markup_map["input_email"].text = f"{Emoji.ENVELOPE + Emoji.PLUS} Add email"
+            if user["email"]:
+                self.markup_map['delete_email'].on()
+                self.markup_map['input_email'].text = f'{Emoji.ENVELOPE + Emoji.UP} Change email'
             else:
-                await self._interface.handling_unexpected_error(response)
-                return
+                self.markup_map['delete_email'].off()
+                self.markup_map["input_email"].text = f"{Emoji.ENVELOPE + Emoji.PLUS} Add email"
 
-        await super().open()
+            await super().open()
 
     async def update_password(self):
-        payload = {
-            "telegram_id": self._interface.chat_id,
-            "hash": storage.get(f"hash:{self._interface.chat_id}"),
-        }
-        async with (self._interface.session.patch(f"/update_password/{await encode_jwt(payload)}") as response):
-            if response.status == 200:
+        async with self._interface.session.put(
+            f"/users/password",
+            json={
+                "user_id": self._interface.chat_id,
+                "hash": storage.get(f"hash:{self._interface.chat_id}"),
+            },
+            headers={"Authorization": storage.get("service_key")}
+        ) as response:
+            response = self._interface.response_middleware(response)
+            if response is not None:
                 await self._interface.update_feedback(f'Password updated', type_="info")
                 await self._interface.basic_manager.title_screen.open()
-            elif response.status == 401:
-                await self._interface.close_session()
-            else:
-                await self._interface.handling_unexpected_error(response)
 
     async def delete_password(self):
-        async with self._interface.session.delete("/delete_password") as response:
-            if response.status == 200:
+        async with self._interface.session.delete(
+                f"/users/password",
+                headers={"Authorization": self._interface.token}
+        ) as response:
+            response = self._interface.response_middleware(response)
+            if response is not None:
                 self.markup_map["delete_password"].off()
                 await self._interface.update_feedback("password deleted")
                 await self.open()
-            elif response.status == 401:
-                await self._interface.close_session()
-            else:
-                await self._interface.handling_unexpected_error(response)
 
     async def update_email(self):
-        async with (self._interface.session.patch('/update_email', json={
-            "email": storage.get(f"email:{self._interface.chat_id}"),
-        }) as response):
-            if response.status == 200:
+        async with self._interface.session.put(
+            f"/users/email",
+            json={
+                "email": storage.get(f"email:{self._interface.chat_id}"),
+            },
+            headers={"Authorization": self._interface.token}
+        ) as response:
+            response = self._interface.response_middleware(response)
+            if response is not None:
                 await self._interface.update_feedback(f'Email updated', type_="info")
                 await self.open()
-            elif response.status == 401:
-                await self._interface.close_session()
-            else:
-                await self._interface.handling_unexpected_error(response)
 
     async def delete_email(self):
-        async with self._interface.session.delete("/delete_email") as response:
-            if response.status == 200:
+        async with self._interface.session.delete(
+                f"/users/email",
+                headers={"Authorization": self._interface.token}
+        ) as response:
+            response = self._interface.response_middleware(response)
+            if response is not None:
                 self.markup_map["delete_email"].off()
-                await self._interface.update_feedback("password deleted")
+                await self._interface.update_feedback("email deleted")
                 await self.open()
-            elif response.status == 401:
-                await self._interface.close_session()
-            else:
-                await self._interface.handling_unexpected_error(response)
 
     async def update_notifications_time(self):
         hour = storage.get(f"hour:{self._interface.chat_id}")
         minute = storage.get(f"minute:{self._interface.chat_id}")
 
-        async with self._interface.session.patch('/notification_time', json={"hour": hour, "minute": minute}) as response:
-            if response.status == 200:
+        async with self._interface.session.put(
+                "/users/notifications",
+                json={"hour": hour, "minute": minute},
+                headers={"Authorization": self._interface.token}
+        ) as response:
+            response = self._interface.response_middleware(response)
+            if response is not None:
                 self.text_map["notification_time"].data = f"{hour}:{minute}"
+                await self._interface.refresh_notifications()
                 await self.open()
-            elif response.status == 401:
-                await self._interface.close_session()
-            else:
-                await self._interface.handling_unexpected_error(response)
-
-        async with self._interface.session.get(f"/is_all_done/{await self._interface.encoded_chat_id()}") as response:
-            if response.status == 200:
-                if await response.text() == "1":
-                    await self._interface.notification_off()
-                else:
-                    await self._interface.notification_on()
-            elif response.status == 401:
-                await self._interface.close_session()
-            else:
-                await self._interface.handling_unexpected_error(response)
 
 
 class InputPassword(TextMarkup):
@@ -396,9 +390,7 @@ class PasswordResume(TextMarkup):
             self.text_map['suggestions'].on()
 
         await super().open()
-        await self.text_map['warning'].reset()
         self.text_map['warning'].off()
-        await self.text_map['suggestions'].reset()
         self.text_map['suggestions'].off()
         await self._interface.update_interface_in_redis()
 
@@ -586,41 +578,35 @@ class AuthorizationWithPassword(TextMarkup):
         )
 
     async def open(self):
-        async with self._interface.session.get(f"/is_email_set/{await self._interface.encoded_chat_id()}") as response:
-            if response.status == 200:
-                response = await response.text()
-                if response == '1':
-                    self.markup_map['reset_password'].on()
-                else:
-                    self.markup_map['reset_password'].off()
+        response = await self._interface.get_user()
+        if response is not None:
+            if (await response.json())["email"]:
+                self.markup_map['reset_password'].on()
             else:
-                await self._interface.handling_unexpected_error(response)
-
+                self.markup_map['reset_password'].off()
         await super().open()
 
     async def __call__(self, password: str):
-        async with self._interface.session.post('/sign_in', json={
-            'telegram_id': self._interface.chat_id, "password": password
-        }) as response:
-            if response.status == 200:
-                self._interface.token = await response.text()
-                await self._interface.basic_manager.profile.open()
-            elif response.status == 401:
-                await self._interface.update_feedback('Wrong password', type_="error")
-                await self.open()
-            else:
-                await self._interface.handling_unexpected_error(response)
+        async with self._interface.session.post('/users/login', json={
+            'user_id': self._interface.chat_id,
+            "password": password,
+        }, headers={"Authorization": storage.get("service_key")}) as response:
+            response = self._interface.response_middleware(response)
+            if response is not None:
+                if response.status == 401:
+                    await self._interface.update_feedback('Wrong password', type_="error")
+                    await self.open()
+                else:
+                    self._interface.token = await response.text()
 
     async def reset_password(self):
         await self._interface.temp_message()
-        async with self._interface.session.get(f'/get_user_email/{await self._interface.encoded_chat_id()}') as response:
-            if response.status == 200:
-                verify_code = await Mailing.verify_email(await response.text())
-                storage.setex(f"verify_email_code:{self._interface.chat_id}", VERIFY_CODE_EXPIRATION, verify_code)
-                await self._interface.update_feedback('Verify code sent on your email', type_="info")
-                await self._interface.basic_manager.input_verify_code_reset_password.open()
-            else:
-                await self._interface.handling_unexpected_error(response)
+        response = self._interface.get_user()
+        if response is not None:
+            verify_code = await Mailing.verify_email((await response.json())["email"])
+            storage.setex(f"verify_email_code:{self._interface.chat_id}", VERIFY_CODE_EXPIRATION, verify_code)
+            await self._interface.update_feedback('Verify code sent on your email', type_="info")
+            await self._interface.basic_manager.input_verify_code_reset_password.open()
 
 
 class InputVerifyCodeResetPassword(TextMarkup):

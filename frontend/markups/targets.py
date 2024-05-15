@@ -1,13 +1,11 @@
 import re
 
-from aiogram.fsm.context import FSMContext
-from aiohttp import ClientSession
-from apscheduler.triggers.cron import CronTrigger
+from aiogram.filters.callback_data import CallbackData
 
 from frontend.bot.FSM import States
-from frontend.markups.core import *
+from frontend.markups.core import TextMarkup, TextMap, DataTextWidget, MarkupMap, ButtonWidget, TextWidget
+
 from frontend.utils import config, Emoji, storage
-from frontend.utils.scheduler import scheduler, remainder
 
 MAX_EMAIL_LENGTH = config.getint('limitations', 'MAX_EMAIL_LENGTH')
 MAX_NAME_LENGTH = config.getint('limitations', 'MAX_NAME_LENGTH')
@@ -42,8 +40,6 @@ class TargetsManager:
 
         self.conform_delete_target = ConformDeleteTarget(interface)
 
-        self.current_target_id = None
-
                 
 class TargetsControl(TextMarkup):
     def __init__(self, interface):
@@ -51,7 +47,7 @@ class TargetsControl(TextMarkup):
             interface,
             TextMap(
                 {
-                    "total_completed": DataTextWidget(header=f'{Emoji.SHINE_STAR} Total completed targets'),
+                    "total_completed": DataTextWidget(header=f'{Emoji.SHINE_STAR} Total completed targets for all time'),
                     "progress_today": DataTextWidget(header=f'{Emoji.DIAGRAM} Progress today')
                 }
             ),
@@ -86,24 +82,14 @@ class TargetsControl(TextMarkup):
         )
 
     async def open(self):
-        async with self._interface.session.get('/completed_targets') as response:
-            if response.status == 200:
-                self.text_map["total_completed"].data = str(len(await response.json()))
-            elif response.status == 401:
-                await self._interface.close_session()
-            else:
-                await self._interface.handling_unexpected_error(response)
-
-        async with self._interface.session.get('/targets') as response:
-            if response.status == 200:
-                total_targets = str(len(await response.json()))
-                completed_targets_today = len([target for target in (await response.json()) if target["completed"]])
-                self.text_map["progress_today"].data = f"{completed_targets_today}/{total_targets}"
-            elif response.status == 401:
-                await self._interface.close_session()
-            else:
-                await self._interface.handling_unexpected_error(response)
-
+        response = await self._interface.get_targets()
+        if response is not None:
+            targets = await response.json()
+            total_completed = sum((1 for target in targets if target["progress"] == target["border_progress"]))
+            total_completed_today = sum((1 for target in targets if target["completed"] and target["progress"] != target["border_progress"]))
+            total_uncompleted = sum((1 for target in targets if target["progress"] != target["border_progress"]))
+            self.text_map["total_completed"].data = f"{total_completed}"
+            self.text_map["progress_today"].data = f"{total_completed_today}/{total_uncompleted}"
         await super().open()
 
     async def create_target(self):
@@ -111,47 +97,27 @@ class TargetsControl(TextMarkup):
         name = storage.get(f"target_name:{user_id}")
         border = storage.get(f"target_border:{user_id}")
 
-        async with self._interface.session.post('/create_target', json={
+        async with self._interface.session.post('/targets', json={
             "name": name,
             "border_progress": border
-        }) as response:
-            if response.status == 200:
+        }, headers={"Authorization": self._interface.token}) as response:
+            response = await self._interface.response_middleware(response, 201)
+            if response is not None:
                 await self._interface.update_feedback(f'{Emoji.SPROUT} Target with name {name} created')
-                async with self._interface.session.get(f'/notification_time/{await self._interface.encoded_chat_id()}') as response_:
-                    time = await response_.json()
-                    hour, minute = time["hour"], time['minute']
+                await self._interface.refresh_notifications()
                 await self._interface.targets_manager.targets_control.open()
-                scheduler.add_job(func=remainder, trigger=CronTrigger(hour=hour, minute=minute), args=(self._interface.chat_id,), replace_existing=True, id=str(self._interface.chat_id))
-            elif response.status == 401:
-                await self._interface.close_session()
-            else:
-                await self._interface.handling_unexpected_error(response)
 
     async def delete_target(self):
-        target_id = self._interface.targets_manager.current_target_id
-        async with self._interface.session.delete(f'/delete_target/{target_id}') as response:
-            if response.status == 200:
-                await self._interface.update_feedback(
-                    f'{Emoji.DENIAL} Target with name {self._interface.storage["targets"][target_id]["name"]} deleted')
+        async with self._interface.session.delete(
+            f'/targets/{storage.get(f"target_id:{self._interface.chat_id}")}',
+            headers={"Authorization": self._interface.token}
+        ) as response:
+            response = await self._interface.response_middleware(response)
+            if response is not None:
+                await self._interface.update_feedback("Target deleted", type_="info")
                 await self._interface.targets_manager.targets.open()
-            elif response.status == 401:
-                await self._interface.close_session()
-            else:
-                await self._interface.handling_unexpected_error(response)
 
-            async with self._interface.session.get(f"/is_all_done/{await self._interface.encoded_chat_id()}") as response:
-                if response.status == 200:
-                    if await response.text() == "1":
-                        await self._interface.notification_off()
-                    else:
-                        await self._interface.notification_on()
-                elif response.status == 401:
-                    await self._interface.close_session()
-                else:
-                    self._interface.handling_unexpected_error(response)
-
-
-
+            await self._interface.refresh_notifications()
 
 
 class InputTargetName(TextMarkup):
@@ -210,8 +176,12 @@ class InputTargetBorder(TextMarkup):
         await super().open()
 
     async def __call__(self, border: str):
-        if not re.fullmatch(r'\d{1,3}', border):
-            await self._interface.update_feedback(f'Border value must be integer and at {MIN_BORDER_RANGE} to {MAX_BORDER_RANGE}', type_="error")
+        try:
+            border = int(border)
+        except ValueError:
+            await self._interface.update_feedback(f"Border value must be integer")
+        if not MIN_BORDER_RANGE <= border <= MAX_BORDER_RANGE:
+            await self._interface.update_feedback(f'Border range must be at {MIN_BORDER_RANGE} to {MAX_BORDER_RANGE}', type_="error")
             await self.open()
         else:
             storage.set(f"target_border:{self._interface.chat_id}", int(border))
@@ -230,53 +200,51 @@ class Targets(TextMarkup):
         )
 
     async def open(self):
-        self._interface.targets_manager.current_target_id = None
-        async with self._interface.session.get('/targets') as response:
-            if response.status == 200:
-                targets_ = await response.json()
+        storage.delete(f"target_id:{self._interface.chat_id}")
+        response = self._interface.response_middleware()
+        if response is not None:
+            targets = await response.json()
 
-                if not targets_:
-                    await self._interface.update_feedback("No current targets so far", type_="info")
-                    await self._interface.targets_manager.targets_control.open()
-                    return
+            if not targets:
+                await self._interface.update_feedback("No current targets so far", type_="info")
+                await self._interface.targets_manager.targets_control.open()
+                return
 
-                total_completed = 0
-                total_targets = len(targets_)
-                markup_map = MarkupMap()
-                for i, target in enumerate(targets_):
-                    if target["completed"]:
-                        total_completed += 1
-                        await markup_map.add_buttons(
-                            {
-                                target["id"]: ButtonWidget(
-                                    text=target["name"],
-                                    callback_data=ShowTargetCallbackData(id=target["id"]),
-                                    mark=Emoji.OK
-                                )
-                            }
-                        )
-                    else:
-                        await markup_map.add_buttons(
-                            {
-                                target["id"]: ButtonWidget(
-                                    text=target["name"],
-                                    callback_data=ShowTargetCallbackData(id=target["id"]),
-                                ),
-                            }
-                        )
+            targets = [target for target in targets if target["progress"] != target["border_progress"]]
 
-                await markup_map.add_buttons(
-                    {
-                        "back": ButtonWidget(text=f"{Emoji.BACK} Back", callback_data="targets_control")
-                    }
-                )
-                self.markup_map = markup_map
-                self.text_map['info'].data = f'{total_completed}/{total_targets}'
-                await super().open()
-            elif response.status == 401:
-                await self._interface.close_session()
-            else:
-                await self._interface.handling_unexpected_error(response)
+            total_completed = 0
+            total_targets = len(targets)
+            markup_map = MarkupMap()
+            for i, target in enumerate(targets):
+                if target["completed"]:
+                    total_completed += 1
+                    await markup_map.add_buttons(
+                        {
+                            target["id"]: ButtonWidget(
+                                text=target["name"],
+                                callback_data=ShowTargetCallbackData(id=target["id"]),
+                                mark=Emoji.OK
+                            )
+                        }
+                    )
+                else:
+                    await markup_map.add_buttons(
+                        {
+                            target["id"]: ButtonWidget(
+                                text=target["name"],
+                                callback_data=ShowTargetCallbackData(id=target["id"]),
+                            ),
+                        }
+                    )
+
+            await markup_map.add_buttons(
+                {
+                    "back": ButtonWidget(text=f"{Emoji.BACK} Back", callback_data="targets_control")
+                }
+            )
+            self.markup_map = markup_map
+            self.text_map['info'].data = f'{total_completed}/{total_targets}'
+            await super().open()
 
 
 class Target(TextMarkup):
@@ -310,49 +278,37 @@ class Target(TextMarkup):
 
     async def open(self, **kwargs):
         storage.set(f"target_id:{self._interface.chat_id}", kwargs["target_id"])
-        async with (self._interface.session.get(f"/target/{kwargs['target_id']}") as response):
-            target = await response.json()
-        self.text_map['name'].data = target["name"]
+        async with (self._interface.session.get(f"/targets/{kwargs['target_id']}", headers={"Authorization": self._interface.token}) as response):
+            response = await self._interface.response_middleware()
+            if response is not None:
+                target = await response.json()
+                self.text_map['name'].data = target["name"]
 
-        if target["description"] is None:
-            self.text_map['description'].off()
-        else:
-            self.text_map['description'].on()
-            self.text_map['description'].data = target["description"]
+                if target["description"] is None:
+                    self.text_map['description'].off()
+                else:
+                    self.text_map['description'].on()
+                    self.text_map['description'].data = target["description"]
 
-        percent_progress = round(target['progress'] / target['border_progress'] * 100)
-        quantity_green_squares = round(percent_progress / 100 * 10)
-        view_progress = Emoji.GREEN_BIG_SQUARE * quantity_green_squares + Emoji.GREY_BUG_SQUARE * (10 - quantity_green_squares)
-        self.text_map["percent_progress"].data = f"{percent_progress}% {view_progress}"
+                percent_progress = round(target['progress'] / target['border_progress'] * 100)
+                quantity_green_squares = round(percent_progress / 100 * 10)
+                view_progress = Emoji.GREEN_BIG_SQUARE * quantity_green_squares + Emoji.GREY_BUG_SQUARE * (10 - quantity_green_squares)
+                self.text_map["percent_progress"].data = f"{percent_progress}% {view_progress}"
 
-        self.text_map['completed'].data = Emoji.OK if target["completed"] else Emoji.DENIAL
+                self.text_map['completed'].data = Emoji.OK if target["completed"] else Emoji.DENIAL
 
-        self.markup_map["completed"].text = f'{Emoji.DENIAL} Incomplete' if target["completed"] else f'{Emoji.OK} Complete'
+                self.markup_map["completed"].text = f'{Emoji.DENIAL} Incomplete' if target["completed"] else f'{Emoji.OK} Complete'
 
-        await super().open()
+                await super().open()
 
     async def invert_complete(self):
         target_id = storage.get(f"target_id:{self._interface.chat_id}")
-        async with self._interface.session.patch(f'/invert_target_completed/{target_id}') as response:
-            if response.status == 200:
-                response = await response.text()
+        async with self._interface.session.patch(f'/targets/{target_id}/invert', headers={"Authorization": self._interface.token}) as response:
+            response = await self._interface.response_middleware(response)
+            if response is not None:
                 self.markup_map['completed'].text = f'{Emoji.DENIAL} Incomplete' if response == '1' else f'{Emoji.OK} Complete'
+                await self._interface.refresh_notifications(response)
                 await self.open(target_id=target_id)
-
-                async with self._interface.session.get(f"/is_all_done/{await self._interface.encoded_chat_id()}") as response:
-                    if response.status == 200:
-                        if await response.text() == "1":
-                            await self._interface.notification_off()
-                        else:
-                            await self._interface.notification_on()
-                    elif response.status == 401:
-                        await self._interface.close_session()
-                    else:
-                        await self._interface.handling_unexpected_error(response)
-            elif response.status == 401:
-                await self._interface.close_session()
-            else:
-                await self._interface.handling_unexpected_error(response)
 
 
 class UpdateTargetName(TextMarkup):
@@ -383,13 +339,13 @@ class UpdateTargetName(TextMarkup):
             await self._interface.update_feedback(f"Name must contains only latin symbols or _ or spaces or digits")
             await self.open()
         else:
-            async with self._interface.session.patch(f'/update_target_name/{target_id}?name={name}') as response:
-                if response.status == 200:
+            async with self._interface.session.patch(
+                f'/target/{target_id}', json={"name": name},
+                headers={"Authorization": self._interface.token}
+            ) as response:
+                response = await self._interface.response_middleware(response)
+                if response is not None:
                     await self._interface.targets_manager.target.open(target_id=target_id)
-                elif response.status == 401:
-                    await self._interface.close_session()
-                else:
-                    await self._interface.handling_unexpected_error(response)
 
 
 class UpdateTargetDescription(TextMarkup):
@@ -417,16 +373,19 @@ class UpdateTargetDescription(TextMarkup):
             await self._interface.update_feedback(f"Maximum description length is {MAX_DESCRIPTION_LENGTH} simbols")
             await self.open()
         elif not re.fullmatch(r'[\w\s,?!:.]+', description, flags=re.I):
-            await self._interface.update_feedback(f"Description must contains only latin symbols or _ or , or ? or ! or : or . or spaces or digits", type_="error")
+            await self._interface.update_feedback(
+                f"Description must contains only latin symbols or _ or , or ? or ! or : or . or spaces or digits",
+                type_="error"
+            )
             await self.open()
         else:
-            async with self._interface.session.patch(f'/update_target_description/{target_id}?description={description}') as response:
-                if response.status == 200:
+            async with self._interface.session.patch(
+                    f'/target/{target_id}', json={"name": description},
+                    headers={"Authorization": self._interface.token}
+            ) as response:
+                response = await self._interface.response_middleware(response)
+                if response is not None:
                     await self._interface.targets_manager.target.open(target_id=target_id)
-                elif response.status == 401:
-                    await self._interface.close_session()
-                else:
-                    await self._interface.handling_unexpected_error(response)
 
 
 class ConformDeleteTarget(TextMarkup):
@@ -465,35 +424,33 @@ class CompletedTargets(TextMarkup):
         )
 
     async def open(self):
-        async with self._interface.session.get('/completed_targets') as response:
-            if response.status == 200:
-                targets = await response.json()
-                if not targets:
-                    await self._interface.update_feedback("no completed targets so far", type_="info")
-                    await self._interface.targets_manager.targets_control.open()
-                    return
-                self.text_map["info"].data = len(targets)
-                markup_map = MarkupMap()
-                for target in targets:
-                    await markup_map.add_buttons(
-                        {
-                            "name": ButtonWidget(
-                                text=target["name"],
-                                callback_data=ShowCompletedTargetCallbackData(id=self._interface.targets_manager.current_target_id)
-                            )
-                        }
-                    )
+        response = self._interface.get_targets()
+        if response is not None:
+            targets = await response.json()
+            targets = [target for target in targets if target["progress"] == target["border_progress"]]
+            if not targets:
+                await self._interface.update_feedback("no completed targets so far", type_="info")
+                await self._interface.targets_manager.targets_control.open()
+                return
+
+            self.text_map["info"].data = str(len(targets))
+            markup_map = MarkupMap()
+            for target in targets:
                 await markup_map.add_buttons(
                     {
-                        "back": ButtonWidget(text=f"{Emoji.BACK} Back", callback_data="targets_control")
+                        "name": ButtonWidget(
+                            text=target["name"],
+                            callback_data=ShowCompletedTargetCallbackData(id=self._interface.targets_manager.current_target_id)
+                        )
                     }
                 )
-                self.markup_map = markup_map
-                await super().open()
-            elif response.status == 401:
-                await self._interface.close_session()
-            else:
-                await self._interface.handling_unexpected_error(response)
+            await markup_map.add_buttons(
+                {
+                    "back": ButtonWidget(text=f"{Emoji.BACK} Back", callback_data="targets_control")
+                }
+            )
+            self.markup_map = markup_map
+            await super().open()
 
 
 class CompletedTarget(TextMarkup):
@@ -522,18 +479,23 @@ class CompletedTarget(TextMarkup):
 
     async def open(self, **kwargs):
         storage.set(f"target_id:{self._interface.chat_id}", kwargs["target_id"])
-        async with self._interface.session.get(f"/target/{kwargs['target_id']}") as response:
-            target = await response.json()
+        async with self._interface.session.get(
+                f"/target/{kwargs['target_id']}",
+                headers={"Authorization": self._interface.chat_id}
+        ) as response:
+            response = await self._interface.response_middleware(response)
+            if response is not None:
+                target = await response.json()
 
-        self.text_map['name'].data = target["name"]
+                self.text_map['name'].data = target["name"]
 
-        if target.description is None:
-            self.text_map['description'].off()
-        else:
-            self.text_map['description'].data = target["description"]
+                if target.description is None:
+                    self.text_map['description'].off()
+                else:
+                    self.text_map['description'].data = target["description"]
 
-        self.text_map["create_datetime"].data = target["create_datetime"]
+                self.text_map["create_datetime"].data = target["create_datetime"]
 
-        self.text_map['completed_datetime'].data = target["completed_datetime"]
+                self.text_map['completed_datetime'].data = target["completed_datetime"]
 
-        await super().open()
+                await super().open()

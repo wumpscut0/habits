@@ -25,7 +25,7 @@ class UserQueries:
 
     @staticmethod
     async def get_user(session: AsyncSession, user_id: int):
-        user = await session.get(UserORM, ident=user_id)
+        user = (await session.get(UserORM, ident=user_id)).as_dict_()
         if user is None:
             raise HTTPException(
                 status_code=404, detail="User not found"
@@ -35,8 +35,8 @@ class UserQueries:
 
 class PasswordQueries:
     @staticmethod
-    async def update_password(session: AsyncSession, user_id: int, hash_: str):
-        await session.execute(update(UserORM).where(UserORM.id == user_id).values({"hash": hash_}))
+    async def update_password(session: AsyncSession, user_id: int, hash: str):
+        await session.execute(update(UserORM).where(UserORM.id == user_id).values({"hash": hash}))
 
     @staticmethod
     async def delete_password(session: AsyncSession, user_id: int):

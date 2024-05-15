@@ -16,12 +16,7 @@ class Base(DeclarativeBase):
     ...
 
 
-class AsDictMixin:
-    def as_dict_(self):
-        return {column.name: getattr(self, column.name) for column in self.__table__.columns}
-
-
-class UserORM(Base, AsDictMixin):
+class UserORM(Base):
     __tablename__ = 'user'
     id = Column(BIGINT, primary_key=True, autoincrement=False, nullable=False)
     hash = Column(String, nullable=True)
@@ -31,8 +26,21 @@ class UserORM(Base, AsDictMixin):
 
     targets = relationship('TargetORM')
 
+    def as_dict_(self):
+        data = {}
+        for column in self.__table__.columns:
+            if column.name == "notification_time":
+                time_ = getattr(self, column.name)
+                data[column.name] = {
+                    "hour": time_.hour,
+                    "minute": time_.minute
+                }
+            else:
+                data[column.name] = getattr(self, column.name)
+        return data
 
-class TargetORM(Base, AsDictMixin):
+
+class TargetORM(Base):
     __tablename__ = 'target'
     id = Column(Integer, primary_key=True)
     create_datetime = Column(DateTime, default=datetime.now())
@@ -45,3 +53,17 @@ class TargetORM(Base, AsDictMixin):
     border_progress = Column(Integer, default=21)
 
     user_id = Column(BIGINT, ForeignKey('user.id'), nullable=False)
+
+    def as_dict_(self):
+        data = {}
+        for column in self.__table__.columns:
+            if column.name == "create_datetime":
+                datetime_ = getattr(self, column.name)
+                data[column.name] = datetime_.strftime("%d.%m.%y %H:%M:%S")
+            elif column.name == "completed_datetime":
+                datetime_ = getattr(self, column.name)
+                if datetime_ is not None:
+                    data[column.name] = datetime_.strftime("%d.%m.%y %H:%M:%S")
+            else:
+                data[column.name] = getattr(self, column.name)
+        return data

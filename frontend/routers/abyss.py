@@ -1,13 +1,9 @@
-import datetime
-
 from aiogram import Router, F
 from aiogram.filters import StateFilter, Command
-from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, BotCommand
 
 from frontend.bot import bot
 from frontend.controller import Interface
-from frontend.utils import storage
 from frontend.utils.scheduler import scheduler
 
 abyss_router = Router()
@@ -25,11 +21,8 @@ async def jobs(message: Message, interface: Interface):
     current_jobs = scheduler.get_jobs()
     jobs_ = ''
     for job in current_jobs:
-        jobs_ += job.name + str(job.next_run_time) + '\n' + job.id
+        jobs_ += job.name + '\n' + str(job.next_run_time)
     message_ = await bot.send_message(chat_id=interface.chat_id, text=jobs_)
-    trash = storage.get(f"trash:{interface.chat_id}")
-    trash.append(message.message_id)
-    storage.set(f"trash:{interface.chat_id}")
     await interface.refill_trash(message_.message_id)
     await interface.update_interface_in_redis()
     await message.delete()

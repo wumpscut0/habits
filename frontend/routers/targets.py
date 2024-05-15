@@ -1,8 +1,6 @@
-from aiohttp import ClientSession
 from aiogram.types import CallbackQuery
 from aiogram import Router, F
 from aiogram.filters import StateFilter
-from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from frontend.markups.targets import ShowTargetCallbackData, ShowCompletedTargetCallbackData
@@ -118,7 +116,3 @@ async def open_conform_delete_target(callback: CallbackQuery, interface: Interfa
 @targets_router.callback_query(F.data == "delete_target")
 async def delete_target(callback: CallbackQuery, interface: Interface):
     await interface.targets_manager.targets_control.delete_target()
-
-
-########################################################################################################################
-

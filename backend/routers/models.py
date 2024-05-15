@@ -57,13 +57,11 @@ class AuthApiModel(BaseModel):
 
 class UpdatePasswordApiModel(BaseModel):
     user_id: UserIdApiModel
-    hash_: str
+    hash: str
 
 
-class TargetApiModel(BaseModel):
+class TargetNameApiModel:
     name: str
-    border_progress: int | None = None
-    description: str | None = None
     @async_field_validator("name", mode="before")
     @classmethod
     async def name_validate(cls, name):
@@ -73,6 +71,27 @@ class TargetApiModel(BaseModel):
                 f"Max name length is {MAX_NAME_LENGTH}"
             )
         return name
+
+
+class TargetDescriptionApiModel:
+    description: str
+
+    @async_field_validator("name", mode="before")
+    @classmethod
+    async def name_validate(cls, name):
+        if len(name) > MAX_NAME_LENGTH:
+            raise HTTPException(
+                400,
+                f"Max name length is {MAX_NAME_LENGTH}"
+            )
+        return name
+
+
+class TargetApiModel(BaseModel):
+    name: TargetNameApiModel
+    border_progress: int | None = None
+    description: TargetDescriptionApiModel | None = None
+
 
     @async_field_validator('border_progress', mode='before')
     @classmethod
@@ -85,16 +104,10 @@ class TargetApiModel(BaseModel):
                 )
         return border_progress
 
-    @async_field_validator('description', mode='before')
-    @classmethod
-    async def description_validate(cls, description):
-        if description is not None:
-            if len(description) > MAX_DESCRIPTION_LENGTH:
-                raise HTTPException(
-                    400,
-                    detail=f'Max description length is {MAX_DESCRIPTION_LENGTH} symbols'
-                )
-        return description
+
+class UpdateTargetApiModel(BaseModel):
+    name: TargetNameApiModel | None = None
+    description: TargetDescriptionApiModel | None = None
 
 
 class NotificationTimeApiModel(BaseModel):
