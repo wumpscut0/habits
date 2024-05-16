@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "frontend"
+version = "0.1.0"
+description = ""
+authors = ["wynardtage0 <fishface6666@mail.ru>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+APScheduler = "^3.10.4"
+aiogram = "^3.6.0"
+redis = "^5.0.4"
+python-dotenv = "^1.0.1"
+passlib = "^1.7.4"
+zxcvbn-python = "^4.4.24"
+aiosmtplib = "^3.0.1"
+cryptography = "^42.0.7"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

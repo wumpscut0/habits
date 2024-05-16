@@ -1,12 +1,36 @@
 services:
+  api:
+    depends_on:
+      - postgres
+    build:
+      context: server
+    ports:
+      - "8000:8000"
+    networks:
+      - bridge
+    environment:
+      DATABASE: postgresql+asyncpg://postgres:postgres@postgres:5432
+  bot:
+    ports:
+      - "80:80"
+    depends_on:
+      - redis
+      - api
+    build:
+      context: client
+    environment:
+      BACKEND: http://api:8000
+      REDIS_HOST: redis
+    networks:
+      - bridge
+
   postgres:
     image: postgres
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_DATABASE: habits
+      POSTGRES_DB: habits
       POSTGRES_PASSWORD: postgres
-      POSTGRES_HOST: localhost
       POSTGRES_USER: postgres
     networks:
       - bridge
@@ -17,30 +41,17 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/var/lib/redis
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
-    depends_on:
-      - postgres
-      - redis
+      - redis_data:/data
+    networks:
+      - bridge
+
 
 volumes:
   pg_data:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: $PWD/pg_data
   redis_data:
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: $PWD/redis_data
+
 networks:
-  bridge:
-    driver: bridge
+   bridge:
+     driver: bridge
