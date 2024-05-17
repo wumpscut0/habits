@@ -9,13 +9,14 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
 from server.database.models import Base
+from server.utils import config
 from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
-config = configparser.ConfigParser()
-config.read('/server/database/alembic.ini')
+
+
 config.set('alembic', 'sqlalchemy.url', os.getenv("DATABASE") + '/habits')
 
-with open('/server/database/alembic.ini', 'w') as configfile:
+with open('alembic.ini', 'w') as configfile:
     config.write(configfile)
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

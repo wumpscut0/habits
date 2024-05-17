@@ -56,64 +56,69 @@ class CustomRedis(Redis):
 class Storage:
     storage = CustomRedis(host=os.getenv("REDIS_HOST"), port=int(os.getenv("REDIS_PORT")), db=1)
 
-    def __init__(self, user_id: int):
+    def __init__(self, user_id=None):
         self.user_id = user_id
+
+    @property
+    def is_user_exists(self):
+        return self.storage.get(f"is_user_exists:{self.user_id}")
+
+    @is_user_exists.setter
+    def is_user_exists(self, data: Any):
+        self.storage.set(f"is_user_exists:{self.user_id}", data)
+
+    @property
+    def admins(self):
+        return self.storage.get(f"admins")
+
+    @admins.setter
+    def admins(self, data: Any):
+        self.storage.set(f"admins", data)
 
     @property
     def user_token(self):
         return self.storage.get(f"token:{self.user_id}")
 
     @user_token.setter
-    def user_token(self, token: Any):
-        self.storage.set(f"token:{self.user_id}", token)
-
-    @property
-    def service_token(self):
-        return self.storage.get("service_key")
-
-    @service_token.setter
-    def service_token(self, token: Any):
-        self.storage.set("service_key", token)
+    def user_token(self, data: Any):
+        self.storage.set(f"token:{self.user_id}", data)
 
     @property
     def message_id(self):
         return self.storage.get(f"message_id:{self.user_id}")
 
     @message_id.setter
-    def message_id(self, message_id: Any):
-        self.storage.set(f"message_id:{self.user_id}", message_id)
+    def message_id(self, data: Any):
+        self.storage.set(f"message_id:{self.user_id}", data)
 
     @property
     def hour(self):
         return self.storage.get(f"hour:{self.user_id}")
 
     @hour.setter
-    def hour(self, hour: Any):
-        self.storage.set(f"hour:{self.user_id}", hour)
+    def hour(self, data: Any):
+        self.storage.set(f"hour:{self.user_id}", data)
 
     @property
     def minute(self):
         return self.storage.get(f"minute:{self.user_id}")
 
     @minute.setter
-    def minute(self, hour: Any):
-        self.storage.set(f"minute:{self.user_id}", hour)
+    def minute(self, data: Any):
+        self.storage.set(f"minute:{self.user_id}", data)
 
     @property
     def trash(self):
         return self.storage.get(f"trash:{self.user_id}")
 
     @trash.setter
-    def trash(self, trash: Any):
-        self.storage.set(f"trash:{self.user_id}", trash)
+    def trash(self, data: Any):
+        self.storage.set(f"trash:{self.user_id}", data)
 
     @property
     def verify_code(self):
         return self.storage.getex(f"verify_code:{self.user_id}")
 
     @verify_code.setter
-    def verify_code(self, verify_code: Any):
-        self.storage.setex(f"verify_code:{self.user_id}", VERIFY_CODE_EXPIRATION, verify_code)
-
-
-
+    def verify_code(self, data: Any):
+        self.storage.setex(f"verify_code:{self.user_id}", VERIFY_CODE_EXPIRATION, data)

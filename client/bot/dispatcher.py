@@ -17,7 +17,7 @@ callback_abyss_router = Router()
 @callback_abyss_router.callback_query()
 async def callback_abyss(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    interface = await BuildInterfaceMiddleware.build_interface(state, callback.from_user.id)
+    interface = await BuildInterfaceMiddleware.build_context(state, callback.from_user.id)
     await interface.update_feedback("Something wrong. Try sign in again.", type_="info")
     await interface.basic_manager.title_screen.open()
 

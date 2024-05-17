@@ -13,26 +13,8 @@ basic_router = Router()
 
 
 @basic_router.message(CommandStart())
-async def open_tittle_screen(message: Message, interface: Interface):
-    await self.clean_trash()
-    await self.state.set_state(None)
-    storage.delete(f"token:{self.chat_id}")
-    message_id = storage.get(str(self.chat_id))
-    try:
-        message = await bot.edit_message_text(
-            chat_id=self.chat_id,
-            message_id=message_id,
-            text=close_msg
-        )
-        return message.message_id
-    except TelegramBadRequest:
-        pass
-    interface.storage.message_id
-    message_id = await self.close_session(close_msg)
-    await self.basic_manager.title_screen.open(new_session=True)
-    if message_id is not None:
-        await self.refill_trash(message_id)
-    await interface.open_session()
+async def open_tittle_screen(message: Message, interface: Bot):
+
     await message.delete()
 
 

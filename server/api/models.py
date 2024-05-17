@@ -14,10 +14,56 @@ MAX_NAME_LENGTH = config.getint("limitations", "MAX_NAME_LENGTH")
 MAX_DESCRIPTION_LENGTH = config.getint('limitations', "MAX_DESCRIPTION_LENGTH")
 MIN_BORDER_RANGE = config.getint('limitations', "MIN_BORDER_RANGE")
 MAX_BORDER_RANGE = config.getint('limitations', "MAX_BORDER_RANGE")
+ID_MAX_LENGTH = config.getint('limitations', "ID_MAX_LENGTH")
+
+
+class Payload(BaseModel):
+    sub: str
+    exp: int
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "Bearer"
 
 
 class UserIdApiModel(BaseModel):
-    user_id: int
+    user_id: str
+
+    @async_field_validator('user_id')
+    async def user_id_validate(self, value: str):
+        if len(value) > ID_MAX_LENGTH:
+            raise HTTPException(
+                400,
+                detail=f'Maximum id length is {ID_MAX_LENGTH}'
+            )
+
+
+class UserApiModel(BaseModel):
+    user_id: str
+    hash: str
+    email: str
+
+    @async_field_validator('email')
+    async def email_validate(self, value: str):
+        if len(value) > MAX_EMAIL_LENGTH:
+            raise HTTPException(
+                400,
+                detail=f'Maximum email length is {MAX_EMAIL_LENGTH}'
+            )
+        if not re.fullmatch(r'[a-zA-Z0-9]+@[a-zA-Z]+\.[a-zA-Z]', value):
+            raise HTTPException(
+                400,
+                detail=f'Invalid email format'
+            )
+
+    @async_field_validator('user_id')
+    async def user_id_validate(self, value: str):
+        if len(value) > ID_MAX_LENGTH:
+            raise HTTPException(
+                400,
+                detail=f'Maximum id length is {ID_MAX_LENGTH}'
+            )
 
 
 class PasswordApiModel(AsyncValidationModelMixin, BaseModel):
@@ -50,13 +96,37 @@ class EmailApiModel(AsyncValidationModelMixin, BaseModel):
 
 
 class AuthApiModel(BaseModel):
-    user_id: UserIdApiModel
-    password: Optional[PasswordApiModel] = None
+    user_id: str
+    password: Optional[str] = None
+
+    @async_field_validator('user_id')
+    async def user_id_validate(self, value: str):
+        if len(value) > ID_MAX_LENGTH:
+            raise HTTPException(
+                400,
+                detail=f'Maximum id length is {ID_MAX_LENGTH}'
+            )
+
+    @async_field_validator('password')
+    async def password_validate(self, value: str):
+        if len(value) > MAX_PASSWORD_LENGTH:
+            raise HTTPException(
+                400,
+                detail=f'Maximum password length is {MAX_PASSWORD_LENGTH}'
+            )
 
 
 class UpdatePasswordApiModel(BaseModel):
-    user_id: UserIdApiModel
+    user_id: str
     hash: str
+
+    @async_field_validator('user_id')
+    async def user_id_validate(self, value: str):
+        if len(value) > ID_MAX_LENGTH:
+            raise HTTPException(
+                400,
+                detail=f'Maximum id length is {ID_MAX_LENGTH}'
+            )
 
 
 class TargetNameApiModel(AsyncValidationModelMixin, BaseModel):
@@ -75,18 +145,26 @@ class TargetDescriptionApiModel(AsyncValidationModelMixin, BaseModel):
     description: str
 
     @async_field_validator("description")
-    async def name_validate(self, value: str):
-        if len(value) > MAX_NAME_LENGTH:
+    async def description_validate(self, value: str):
+        if len(value) > MAX_DESCRIPTION_LENGTH:
             raise HTTPException(
                 400,
-                f"Max name length is {MAX_NAME_LENGTH}"
+                f"Max name length is {MAX_DESCRIPTION_LENGTH}"
             )
 
 
 class TargetApiModel(AsyncValidationModelMixin, BaseModel):
     name: TargetNameApiModel
     border_progress: int | None = None
-    description: TargetDescriptionApiModel | None = None
+    description: str | None = None
+
+    @async_field_validator("name")
+    async def name_validate(self, value):
+        if len(value) > MAX_NAME_LENGTH:
+            raise HTTPException(
+                400,
+                f"Max name length is {MAX_NAME_LENGTH}"
+            )
 
     @async_field_validator("border_progress")
     async def border_validate(self, value: int):
@@ -97,10 +175,34 @@ class TargetApiModel(AsyncValidationModelMixin, BaseModel):
                     detail=f'Days for completed target must be in range {MIN_BORDER_RANGE} to {MAX_BORDER_RANGE}'
                 )
 
+    @async_field_validator("description")
+    async def description_validate(self, value: str):
+        if len(value) > MAX_DESCRIPTION_LENGTH:
+            raise HTTPException(
+                400,
+                f"Max name length is {MAX_DESCRIPTION_LENGTH}"
+            )
+
 
 class UpdateTargetApiModel(BaseModel):
-    name: TargetNameApiModel | None = None
-    description: TargetDescriptionApiModel | None = None
+    name: str | None = None
+    description: str | None = None
+
+    @async_field_validator("name")
+    async def name_validate(self, value):
+        if value is not None and len(value) > MAX_NAME_LENGTH:
+            raise HTTPException(
+                400,
+                f"Max name length is {MAX_NAME_LENGTH}"
+            )
+
+    @async_field_validator("description")
+    async def description_validate(self, value: str):
+        if value is not None and len(value) > MAX_DESCRIPTION_LENGTH:
+            raise HTTPException(
+                400,
+                f"Max name length is {MAX_DESCRIPTION_LENGTH}"
+            )
 
 
 class NotificationTimeApiModel(AsyncValidationModelMixin, BaseModel):

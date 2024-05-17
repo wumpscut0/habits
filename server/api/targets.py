@@ -1,74 +1,65 @@
 from typing import Annotated
 
-from fastapi import Header, Query
+from fastapi import Depends, APIRouter
 
 from server.database import Session
-from server.api.models import TargetApiModel, UpdateTargetApiModel
+from server.api.models import TargetApiModel, UpdateTargetApiModel, Payload
 from server.database.queries import TargetsQueries
 from server.utils import config
-from server.api import app, Authority
+from server.api import Authority
 
 MAX_NAME_LENGTH = config.getint('limitations', 'MAX_NAME_LENGTH')
 MAX_DESCRIPTION_LENGTH = config.getint('limitations', 'MAX_DESCRIPTION_LENGTH')
 
+targets_router = APIRouter(prefix="/targets")
 
-@app.get('/targets')
-async def get_targets(Authorization: Annotated[str, Header()]):
+
+@targets_router.get('/')
+async def get_targets(payload: Annotated[Payload, Depends(Authority.user_authorization)]):
     async with Session.begin() as session:
-        user = await Authority.user_authentication(Authorization)
-        return await TargetsQueries.get_targets(session, user.user_id)
+        return await TargetsQueries.get_targets(session, payload.sub)
 
 
-@app.get("/target/{target_id}")
-async def get_target(target_id: int, Authorization: Annotated[str, Header()]):
+@targets_router.get("/{target_id}", dependencies=[Depends(Authority.user_authorization)])
+async def get_target(target_id: int):
     async with Session.begin() as session:
-        await Authority.user_authentication(Authorization)
-
-        await TargetsQueries.get_target(session, target_id)
         return await TargetsQueries.get_target(session, target_id)
 
 
-@app.post('/targets', status_code=201)
-async def create_target(target_api_model: TargetApiModel, Authorization: Annotated[str, Header()]):
+@targets_router.post('/', status_code=201)
+async def create_target(
+        target_api_model: TargetApiModel,
+        payload: Annotated[Payload, Depends(Authority.user_authorization)]
+):
     async with Session.begin() as session:
-        user = await Authority.user_authentication(Authorization)
-        await TargetsQueries.create(session, user.user_id, **target_api_model.model_dump())
+        await TargetsQueries.create(session, payload.sub, **target_api_model.model_dump())
 
 
-@app.put('/targets/{target_id}')
+@targets_router.put('/{target_id}', dependencies=[Depends(Authority.user_authorization)])
 async def update_target_name(
         target_id: int,
         update_target_api_model: UpdateTargetApiModel,
-        Authorization: Annotated[str, Header()],
 ):
     async with Session.begin() as session:
-        await Authority.user_authentication(Authorization)
-
         await TargetsQueries.get_target(session, target_id)
         await TargetsQueries.update(session, **update_target_api_model.model_dump())
 
 
-@app.delete('/targets/{target_id}')
-async def delete_target(target_id: int, Authorization: Annotated[str, Header()]):
+@targets_router.delete('/{target_id}', dependencies=[Depends(Authority.user_authorization)])
+async def delete_target(target_id: int):
     async with Session.begin() as session:
-        await Authority.user_authentication(Authorization)
-
         await TargetsQueries.get_target(session, target_id)
         await TargetsQueries.delete(session, target_id)
 
 
-@app.patch('/targets/{target_id}/invert')
-async def invert_target_completed(target_id: int, Authorization: Annotated[str, Header()]):
+@targets_router.patch('/{target_id}/invert', dependencies=[Depends(Authority.user_authorization)])
+async def invert_target_completed(target_id: int):
     async with Session.begin() as session:
-        await Authority.user_authentication(Authorization)
-
         await TargetsQueries.get_target(session, target_id)
         return await TargetsQueries.invert_completed(session, target_id)
 
 
-@app.patch('/targets/progress')
-async def increase_targets_progress(Authorization: Annotated[str, Header()]):
+@targets_router.patch('/progress')
+async def increase_targets_progress():
     async with Session.begin() as session:
-        await Authority.service_authentication(Authorization)
-
         await TargetsQueries.increase_progress(session)

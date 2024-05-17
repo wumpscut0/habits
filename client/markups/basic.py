@@ -4,6 +4,7 @@ from aiogram.filters.callback_data import CallbackData
 from passlib.handlers.pbkdf2 import pbkdf2_sha256
 from zxcvbn import zxcvbn
 
+from client.api import ServerApi
 from client.bot import bot
 from client.bot.FSM import States
 from client.markups.core import TextMarkup, TextMap, TextWidget, MarkupMap, ButtonWidget, DataTextWidget
@@ -518,53 +519,41 @@ class ChangeNotificationsMinute(TextMarkup):
 
 
 class AuthenticationWithPassword(TextMarkup):
-    def __init__(self):
+    _action = TextWidget(f'{Emoji.KEY} Enter the password')
+    _reset_password = ButtonWidget(
+        text=f'{Emoji.CYCLE} Reset password',
+        callback_data='reset_password'
+    )
+    _back = ButtonWidget(
+        text=f"{Emoji.BACK} Back",
+        callback_data="title_screen"
+    )
+
+    def __init__(self, api: ServerApi):
+        self.api = api
         super().__init__(
             text_map=TextMap(
-                {
-                    "action": TextWidget(f'{Emoji.KEY} Enter the password'),
-                }
-            ),
-            markup_map=MarkupMap(
                 [
-                    {
-                        "reset_password": ButtonWidget(
-                            text=f'{Emoji.CYCLE} Reset password',
-                            callback_data='reset_password'
-                        )
-                    },
-                    {
-                        "back": ButtonWidget(
-                            text=f"{Emoji.BACK} Back",
-                            callback_data="title_screen"
-                        )
-                    }
-                ]
+                    self._action
+                ],
             ),
             state=States.sign_in_with_password
         )
 
     async def open(self):
-        response = await self._interface.get_user()
-        if response is not None:
-            if (await response.json())["email"]:
-                self.markup_map['reset_password'].on()
-            else:
-                self.markup_map['reset_password'].off()
-        await super().open()
+        markup_map = []
+        response = await self.api.get_user()
+        if response.status == 200 and (await response.json()).get("email"):
+            markup_map.append(self._reset_password)
+        markup_map.append(self._back)
 
     async def __call__(self, password: str):
-        async with self._interface.session.post('/users/login', json={
-            'user_id': self._interface.chat_id,
-            "password": password,
-        }, headers={"Authorization": storage.get("service_key")}) as response:
-            response = self._interface.response_middleware(response)
-            if response is not None:
-                if response.status == 401:
-                    await self._interface.update_feedback('Wrong password', type_="error")
-                    await self.open()
-                else:
-                    self._interface.token = await response.text()
+        response = await self.api.authentication(password)
+        if response.status == 401:
+            await self._interface.update_feedback('Wrong password', type_="error")
+            await self.open()
+        else:
+            self._interface.token = await response.text()
 
     async def reset_password(self):
         await self._interface.temp_message()

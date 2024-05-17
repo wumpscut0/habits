@@ -1,7 +1,6 @@
 from datetime import time, datetime
 
-import pytz
-from sqlalchemy import Column, BIGINT, String, VARCHAR, Boolean, Time, Integer, DateTime, ForeignKey
+from sqlalchemy import Column, String, VARCHAR, Boolean, Time, Integer, DateTime, ForeignKey
 from sqlalchemy.orm import DeclarativeBase, relationship
 
 from server.utils import config
@@ -10,6 +9,8 @@ MAX_EMAIL_LENGTH = config.getint('limitations', 'MAX_EMAIL_LENGTH')
 MAX_NAME_LENGTH = config.getint('limitations', 'MAX_NAME_LENGTH')
 MAX_DESCRIPTION_LENGTH = config.getint('limitations', 'MAX_DESCRIPTION_LENGTH')
 DEFAULT_REMAINING_HOUR = config.getint('limitations', "DEFAULT_REMAINING_HOUR")
+ID_MAX_LENGTH = config.getint('limitations', "ID_MAX_LENGTH")
+STANDARD_BORDER_RANGE = config.getint('limitations', "STANDARD_BORDER_RANGE")
 
 
 class Base(DeclarativeBase):
@@ -18,11 +19,11 @@ class Base(DeclarativeBase):
 
 class UserORM(Base):
     __tablename__ = 'user'
-    id = Column(BIGINT, primary_key=True, autoincrement=False, nullable=False)
+    id = Column(VARCHAR(ID_MAX_LENGTH), primary_key=True, autoincrement=False, nullable=False)
     hash = Column(String, nullable=True)
     email = Column(VARCHAR(MAX_EMAIL_LENGTH), nullable=True, unique=True)
     notifications = Column(Boolean, default=True)
-    notification_time = Column(Time, default=time(DEFAULT_REMAINING_HOUR, 0, tzinfo=pytz.utc))
+    notification_time = Column(Time, default=time(DEFAULT_REMAINING_HOUR, 0))
 
     targets = relationship('TargetORM')
 
@@ -52,7 +53,7 @@ class TargetORM(Base):
     progress = Column(Integer, default=0)
     border_progress = Column(Integer, default=21)
 
-    user_id = Column(BIGINT, ForeignKey('user.id'), nullable=False)
+    user_id = Column(VARCHAR(ID_MAX_LENGTH), ForeignKey('user.id'), nullable=False)
 
     def as_dict_(self):
         data = {}
@@ -67,3 +68,9 @@ class TargetORM(Base):
             else:
                 data[column.name] = getattr(self, column.name)
         return data
+
+
+class ServiceORM(Base):
+    __tablename__ = "service"
+    id = Column(VARCHAR(ID_MAX_LENGTH), primary_key=True)
+    api_key = Column(String, nullable=False)

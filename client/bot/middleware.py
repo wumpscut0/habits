@@ -8,7 +8,6 @@ from aiohttp import ClientSession
 
 from client.bot import BotControl
 from client.controller import Interface
-from client.utils import storage
 
 
 class BuildInterfaceMiddleware(BaseMiddleware):
@@ -18,13 +17,13 @@ class BuildInterfaceMiddleware(BaseMiddleware):
         event: Update,
         data: Dict[str, Any]
     ) -> Any:
-        await self.build_interface(data["state"], await self._extract_user_id(event))
+        await self.build_context(data["state"], await self._extract_user_id(event))
         return await handler(event, data)
 
     @classmethod
-    async def build_interface(cls, state: FSMContext, user_id):
+    async def build_context(cls, state: FSMContext, user_id):
         bot_control = BotControl(user_id)
-        if (await state.get_data()).get("has_already_been") is None:
+        if bot_control.storage.is_user_exists is None:
             bot_control.server.add_user()
 
 

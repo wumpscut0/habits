@@ -1,26 +1,28 @@
+from abc import abstractmethod, ABC
 from typing import List, Dict
 
 from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.state import State
+from aiogram.types import InlineKeyboardButton
 from aiogram.utils.formatting import as_list, Text, Bold, Italic
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardMarkup
 
 from client.utils import Emoji
 
 
-class Hideable:
-    def __init__(self, active=True):
-        self._active = active
-
-    def on(self):
-        self._active = True
-
-    def off(self):
-        self._active = False
-
-    @property
-    def active(self):
-        return self._active
+# class Hideable:
+#     def __init__(self, active=True):
+#         self._active = active
+#
+#     def on(self):
+#         self._active = True
+#
+#     def off(self):
+#         self._active = False
+#
+#     @property
+#     def active(self):
+#         return self._active
 
 
 # class Resettable:
@@ -33,9 +35,8 @@ class Hideable:
 #             setattr(self.obj, name, value)
 
 
-class TextWidget(Hideable):
-    def __init__(self, text: str = None, active=True):
-        super().__init__(active)
+class TextWidget:
+    def __init__(self, text: str = None):
         self._text = text
 
     def __repr__(self):
@@ -53,7 +54,7 @@ class TextWidget(Hideable):
         self._text = value
 
 
-class DataTextWidget(Hideable):
+class DataTextWidget:
     def __init__(
             self,
             *,
@@ -62,9 +63,7 @@ class DataTextWidget(Hideable):
             mark: str = '',
             sep: str = ': ',
             end: str = '',
-            active=True
     ):
-        super().__init__(active)
         self.header = header
         self.data = data
         self.mark = mark
@@ -84,16 +83,14 @@ class DataTextWidget(Hideable):
             self.end)
 
 
-class ButtonWidget(Hideable):
+class ButtonWidget:
     def __init__(
             self,
             *,
             text: str = None,
             callback_data: str | CallbackData = None,
             mark: str = '',
-            active=True
     ):
-        super().__init__(active)
         self._text = text
         self._callback_data = callback_data
         self.mark = mark
@@ -135,50 +132,45 @@ class ButtonWidget(Hideable):
 
 
 class TextMap:
-    def __init__(self, map_: Dict[str, DataTextWidget | TextWidget]):
+    def __init__(self, map_: List[DataTextWidget | TextWidget] = None):
         self._map = map_
 
     @property
-    async def text(self):
-        return (as_list(*[text.text for text in self._map.values() if text.active])).as_html()
+    def map(self):
+        return self._map
 
-    def __getitem__(self, name):
-        return self._map[name]
+    @property
+    async def text(self):
+        if self._map is None:
+            return Emoji.BAN
+        return (as_list(*[text.text for text in self._map])).as_html()
+
+    def __getitem__(self, index: int):
+        return self._map[index]
 
 
 class MarkupMap:
-    def __init__(self, map_: List[Dict[str, ButtonWidget]] = None):
-        if map_ is None:
-            self._map = []
-            self._adapt_map = {}
-        else:
-            self._map = map_
-            self._adapt_map = {name: button for row in map_ for name, button in row.items()}
+    def __init__(self, map_: List[List[ButtonWidget]] = None):
+        self.map = map_
 
     @property
     async def markup(self):
+        if self.map is None:
+            return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=Emoji.BAN)]])
+
         markup = InlineKeyboardBuilder()
-        for row in self._map:
-            markup_part = InlineKeyboardBuilder()
-            for button in row.values():
-                if button.active:
-                    markup_part.button(text=button.text, callback_data=button.callback_data)
-            markup.attach(markup_part)
+        for buttons_row in self.map:
+            row = InlineKeyboardBuilder()
+            for button in buttons_row:
+                row.button(text=button.text, callback_data=button.callback_data)
+            markup.attach(row)
         return markup.as_markup()
 
-    def __getitem__(self, name):
-        return self._adapt_map[name]
 
-    async def add_buttons(self, map_: Dict[str, ButtonWidget]):
-        self._map.append(map_)
-        for name, button in map_.items():
-            self._adapt_map[name] = button
-
-
-class TextMarkup:
+class TextMarkup(ABC):
     def __init__(
             self,
-            text_map: TextMap,
+            text_map: TextMap = TextMap(),
             markup_map: MarkupMap = MarkupMap(),
             state: State | None = None
     ):
@@ -186,22 +178,9 @@ class TextMarkup:
         self.markup_map = markup_map
         self.state = state
 
-    async def open(self):
-        trash =
-        for message_id in self._interface.storage.trash:
-            await self.delete_message(message_id)
-        storage.delete(f"trash:{self.chat_id}")
-        message_id = storage.get(f"{self.chat_id}")
-        await self.state.set_state(markup.state)
-        try:
-            await bot.edit_message_text(
-                chat_id=self.chat_id,
-                message_id=message_id,
-                text=(await markup.text) + ('\n' + self.feedback.text.as_html() if self.feedback.active else ''),
-                reply_markup=await markup.markup
-            )
-        except TelegramBadRequest:
-            pass
+    @abstractmethod
+    async def open(self, **kwargs):
+        ...
 
     @property
     async def text(self):
@@ -209,5 +188,4 @@ class TextMarkup:
 
     @property
     async def markup(self):
-        if await self.markup_map.markup is not None:
-            return await self.markup_map.markup
+        return await self.markup_map.markup

@@ -1,86 +1,71 @@
 from typing import Annotated
 from datetime import time
 
-from fastapi import Header, HTTPException
-from starlette.responses import PlainTextResponse
+from fastapi import Depends, APIRouter
 
 from server.database import Session
-from server.api.models import UpdatePasswordApiModel, NotificationTimeApiModel, AuthApiModel, EmailApiModel, \
-    UserIdApiModel
+from server.api.models import UpdatePasswordApiModel, NotificationTimeApiModel, EmailApiModel, \
+    Token, UserApiModel, Payload, UserIdApiModel
 from server.database.queries import PasswordQueries, EmailQueries, NotificationsQueries, UserQueries
-from server.api import app, Authority
+from server.api import Authority
+
+users_router = APIRouter(prefix="/users")
 
 
-@app.post("/users", status_code=201)
-async def registration(user_id_api_model: UserIdApiModel, Authorization: Annotated[str, Header()]):
+@users_router.post("/", status_code=201)
+async def registration(user_api_model: UserApiModel):
     async with Session.begin() as session:
-        await Authority.service_authentication(Authorization)
-        user_id = user_id_api_model.user_id
-        await UserQueries.registration(session, user_id)
+        await UserQueries.registration(session, user_api_model)
 
 
-@app.post("/users/login", response_class=PlainTextResponse)
-async def user_auth(auth_api_model: AuthApiModel, Authorization: Annotated[str, Header()]):
-    await Authority.service_authentication(Authorization)
-    return await Authority.user_authentication(**auth_api_model.model_dump())
+@users_router.post("/login")
+async def user_auth(token: Annotated[Token, Depends(Authority.user_authenticate)]):
+    return token
 
 
-@app.get('/users/{user_id}')
-async def get_user(user_id: str, Authorization: Annotated[str, Header()]):
+@users_router.get('/{user_id}')
+async def get_user(user_id: Annotated[bytes, Depends(Authority.decrypt_message)]):
     async with Session.begin() as session:
-        await Authority.service_authentication(Authorization)
-        user_id = await Authority.decrypt_message(user_id)
-        try:
-            user_id = int(await Authority.decrypt_message(user_id))
-        except ValueError:
-            raise HTTPException(400, "User id must be integer")
-        return await UserQueries.get_user(session, user_id)
+        return await UserQueries.get_user(session, str(user_id))
 
 
-@app.get('/users')
-async def get_users(Authorization: Annotated[str, Header()]):
+@users_router.get('/')
+async def get_users():
     async with Session.begin() as session:
-        await Authority.service_authentication(Authorization)
         return await UserQueries.get_users(session)
 
 
-@app.put('/users/password')
-async def update_password(data: UpdatePasswordApiModel, Authorization: Annotated[str, Header()]):
+@users_router.put('/password')
+async def update_password(update_password_api_model: UpdatePasswordApiModel):
     async with Session.begin() as session:
-        await Authority.service_authentication(Authorization)
-        await PasswordQueries.update_password(session, **data.model_dump())
+        await PasswordQueries.update_password(session, update_password_api_model)
 
 
-@app.delete("/users/password")
-async def delete_password(Authorization: Annotated[str, Header()]):
+@users_router.delete("/password")
+async def delete_password(payload: Annotated[Payload, Depends(Authority.user_authorization)]):
     async with Session.begin() as session:
-        user = await Authority.user_authentication(Authorization)
-        await PasswordQueries.delete_password(session, user.user_id)
+        await PasswordQueries.delete_password(session, payload.sub)
 
 
-@app.put('/users/email')
-async def update_email(email_api_model: EmailApiModel, Authorization: Annotated[str, Header()]):
+@users_router.put('/email')
+async def update_email(email_api_model: EmailApiModel, payload: Annotated[Payload, Depends(Authority.user_authorization)]):
     async with Session.begin() as session:
-        user = await Authority.user_authentication(Authorization)
-        await EmailQueries.update(session, user.user_id, email_api_model.email)
+        await EmailQueries.update(session, payload.sub, email_api_model.email)
 
 
-@app.delete("/users/email")
-async def delete_email(Authorization: Annotated[str, Header()]):
+@users_router.delete("/email")
+async def delete_email(payload: Annotated[Payload, Depends(Authority.user_authorization)]):
     async with Session.begin() as session:
-        user = await Authority.user_authentication(Authorization)
-        await EmailQueries.delete(session, user.user_id)
+        await EmailQueries.delete(session, payload.sub)
 
 
-@app.patch("/users/notifications")
-async def invert_notifications(user_id_api_model: UserIdApiModel, Authorization: Annotated[str, Header()]):
+@users_router.patch("/notifications")
+async def invert_notifications(user_id_api_model: UserIdApiModel):
     async with Session.begin() as session:
-        await Authority.service_authentication(Authorization)
         await NotificationsQueries.invert(session, user_id_api_model.user_id)
 
 
-@app.put("/users/notification")
-async def change_notification_time(time_: NotificationTimeApiModel, Authorization: Annotated[str, Header()]):
+@users_router.put("/notification")
+async def change_notification_time(time_: NotificationTimeApiModel, payload: Annotated[Payload, Depends(Authority.user_authorization)]):
     async with Session.begin() as session:
-        user = await Authority.user_authentication(Authorization)
-        await NotificationsQueries.update(session, user.user_id, time(**time_.model_dump()))
+        await NotificationsQueries.update(session, payload.sub, time(**time_.model_dump()))
