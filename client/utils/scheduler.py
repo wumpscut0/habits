@@ -8,24 +8,17 @@ from aiogram.types.inline_keyboard_markup import InlineKeyboardMarkup
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.redis import RedisJobStore
 
-from client.bot import bot
+from client.bot import BotControl
 from client.utils import Emoji
 from client.utils.loggers import info, errors
 from client.utils.redis import Storage
 
-remainder_text = Bold('Don`t forget mark done target today').as_html()
-remainder_markup = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text=f'{Emoji.OK} Ok', callback_data="close_notification"),
-            ]
-        ]
-    )
+
 
 
 async def remainder(chat_id: int):
     info.info(f'Remaining sent to user {chat_id}')
-    await bot.send_message(chat_id=chat_id, text=remainder_text, reply_markup=remainder_markup)
+    await BotControl(chat_id).create_interface(trash=True, temp=True)
 
 
 async def increase_progress():

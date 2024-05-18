@@ -60,12 +60,36 @@ class Storage:
         self.user_id = user_id
 
     @property
+    def current_interface(self):
+        return self.storage.get(f"current_interface:{self.user_id}")
+
+    @current_interface.setter
+    def current_interface(self, data: Any):
+        self.storage.set(f"current_interface:{self.user_id}", data)
+
+    @property
+    def temp_interface(self):
+        return self.storage.get(f"temp_interface:{self.user_id}")
+
+    @temp_interface.setter
+    def temp_interface(self, data: Any):
+        self.storage.set(f"temp_interface:{self.user_id}", data)
+
+    @property
     def is_user_exists(self):
         return self.storage.get(f"is_user_exists:{self.user_id}")
 
     @is_user_exists.setter
     def is_user_exists(self, data: Any):
         self.storage.set(f"is_user_exists:{self.user_id}", data)
+
+    @property
+    def first_name(self):
+        return self.storage.get(f"first_name:{self.user_id}")
+
+    @first_name.setter
+    def first_name(self, data: Any):
+        self.storage.set(f"first_name:{self.user_id}", data)
 
     @property
     def admins(self):
