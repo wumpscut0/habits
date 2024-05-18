@@ -22,7 +22,7 @@ async def jobs(message: Message, interface: Interface):
     jobs_ = ''
     for job in current_jobs:
         jobs_ += job.name + '\n' + str(job.next_run_time)
-    message_ = await bot.send_message(chat_id=interface.chat_id, text=jobs_)
+    message_ = await bot.send_message(chat_id=interface.user_id, text=jobs_)
     await interface.refill_trash(message_.message_id)
     await interface.update_interface_in_redis()
     await message.delete()

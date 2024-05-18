@@ -93,7 +93,7 @@ class TargetsControl(TextMarkup):
         await super().open()
 
     async def create_target(self):
-        user_id = self._interface.chat_id
+        user_id = self._interface.user_id
         name = storage.get(f"target_name:{user_id}")
         border = storage.get(f"target_border:{user_id}")
 
@@ -109,7 +109,7 @@ class TargetsControl(TextMarkup):
 
     async def delete_target(self):
         async with self._interface.session.delete(
-            f'/targets/{storage.get(f"target_id:{self._interface.chat_id}")}',
+            f'/targets/{storage.get(f"target_id:{self._interface.user_id}")}',
             headers={"Authorization": self._interface.token}
         ) as response:
             response = await self._interface.response_middleware(response)
@@ -147,7 +147,7 @@ class InputTargetName(TextMarkup):
             await self._interface.update_feedback(f"Name must contains only latin symbols or _ or spaces or digits", type_="error")
             await self.open()
         else:
-            storage.set(f"target_name:{self._interface.chat_id}", name)
+            storage.set(f"target_name:{self._interface.user_id}", name)
             await self._interface.targets_manager.input_target_border.open()
 
 
@@ -172,7 +172,7 @@ class InputTargetBorder(TextMarkup):
         )
 
     async def open(self):
-        storage.set(f"target_border:{self._interface.chat_id}", STANDARD_BORDER_RANGE)
+        storage.set(f"target_border:{self._interface.user_id}", STANDARD_BORDER_RANGE)
         await super().open()
 
     async def __call__(self, border: str):
@@ -184,7 +184,7 @@ class InputTargetBorder(TextMarkup):
             await self._interface.update_feedback(f'Border range must be at {MIN_BORDER_RANGE} to {MAX_BORDER_RANGE}', type_="error")
             await self.open()
         else:
-            storage.set(f"target_border:{self._interface.chat_id}", int(border))
+            storage.set(f"target_border:{self._interface.user_id}", int(border))
             await self._interface.targets_manager.targets_control.create_target()
 
 
@@ -200,7 +200,7 @@ class Targets(TextMarkup):
         )
 
     async def open(self):
-        storage.delete(f"target_id:{self._interface.chat_id}")
+        storage.delete(f"target_id:{self._interface.user_id}")
         response = self._interface.response_middleware()
         if response is not None:
             targets = await response.json()
@@ -277,7 +277,7 @@ class Target(TextMarkup):
         )
 
     async def open(self, **kwargs):
-        storage.set(f"target_id:{self._interface.chat_id}", kwargs["target_id"])
+        storage.set(f"target_id:{self._interface.user_id}", kwargs["target_id"])
         async with (self._interface.session.get(f"/targets/{kwargs['target_id']}", headers={"Authorization": self._interface.token}) as response):
             response = await self._interface.response_middleware()
             if response is not None:
@@ -302,7 +302,7 @@ class Target(TextMarkup):
                 await super().open()
 
     async def invert_complete(self):
-        target_id = storage.get(f"target_id:{self._interface.chat_id}")
+        target_id = storage.get(f"target_id:{self._interface.user_id}")
         async with self._interface.session.patch(f'/targets/{target_id}/invert', headers={"Authorization": self._interface.token}) as response:
             response = await self._interface.response_middleware(response)
             if response is not None:
@@ -331,7 +331,7 @@ class UpdateTargetName(TextMarkup):
         )
 
     async def __call__(self, name: str):
-        target_id = storage.get(f"target_id:{self._interface.chat_id}")
+        target_id = storage.get(f"target_id:{self._interface.user_id}")
         if len(name) > MAX_NAME_LENGTH:
             await self._interface.update_feedback(f"Maximum name length is {MAX_NAME_LENGTH} simbols")
             await self.open()
@@ -368,7 +368,7 @@ class UpdateTargetDescription(TextMarkup):
         )
 
     async def __call__(self, description: str):
-        target_id = storage.get(f"target_id:{self._interface.chat_id}")
+        target_id = storage.get(f"target_id:{self._interface.user_id}")
         if len(description) > MAX_DESCRIPTION_LENGTH:
             await self._interface.update_feedback(f"Maximum description length is {MAX_DESCRIPTION_LENGTH} simbols")
             await self.open()
@@ -478,10 +478,10 @@ class CompletedTarget(TextMarkup):
         )
 
     async def open(self, **kwargs):
-        storage.set(f"target_id:{self._interface.chat_id}", kwargs["target_id"])
+        storage.set(f"target_id:{self._interface.user_id}", kwargs["target_id"])
         async with self._interface.session.get(
                 f"/target/{kwargs['target_id']}",
-                headers={"Authorization": self._interface.chat_id}
+                headers={"Authorization": self._interface.user_id}
         ) as response:
             response = await self._interface.response_middleware(response)
             if response is not None:

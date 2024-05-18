@@ -23,13 +23,11 @@ VERIFY_CODE_EXPIRATION = config.getint("limitations", "VERIFY_CODE_EXPIRATION")
 
 
 class TitleScreen(TextMarkup):
+    _info = TextWidget(f"{Emoji.BRAIN} Psychological service")
+
     def __init__(self):
         super().__init__(
-            TextMap(
-                {
-                    "info": TextWidget(f"{Emoji.BRAIN} Psychological service"),
-                }
-            ),
+            TextMap(self._info),
             MarkupMap(
                 [
                     {
@@ -59,7 +57,7 @@ class TitleScreen(TextMarkup):
             self.markup_map["notifications"].mark = Emoji.RED_QUESTION
 
         if kwargs.get('new_session'):
-            user_id = self._interface.chat_id
+            user_id = self._interface.user_id
             message = await bot.send_message(
                 chat_id=user_id,
                 text=await self.text,
@@ -74,7 +72,7 @@ class TitleScreen(TextMarkup):
     async def invert_notifications(self):
         async with self._interface.session.patch(
                 "/users/notifications/invert",
-                json={"user_id": self._interface.chat_id},
+                json={"user_id": self._interface.user_id},
                 headers={"Authorization": storage.get("service_key")}
         ) as response:
             response = await self._interface.response_middleware(response)
@@ -107,7 +105,7 @@ class Profile(TextMarkup):
         )
 
     async def open(self):
-        storage.get(f"first_name:{self._interface.chat_id}")
+        storage.get(f"first_name:{self._interface.user_id}")
         await super().open()
 
 
@@ -187,8 +185,8 @@ class Options(TextMarkup):
         async with self._interface.session.put(
             f"/users/password",
             json={
-                "user_id": self._interface.chat_id,
-                "hash": storage.get(f"hash:{self._interface.chat_id}"),
+                "user_id": self._interface.user_id,
+                "hash": storage.get(f"hash:{self._interface.user_id}"),
             },
             headers={"Authorization": storage.get("service_key")}
         ) as response:
@@ -212,7 +210,7 @@ class Options(TextMarkup):
         async with self._interface.session.put(
             f"/users/email",
             json={
-                "email": storage.get(f"email:{self._interface.chat_id}"),
+                "email": storage.get(f"email:{self._interface.user_id}"),
             },
             headers={"Authorization": self._interface.token}
         ) as response:
@@ -233,8 +231,8 @@ class Options(TextMarkup):
                 await self.open()
 
     async def update_notifications_time(self):
-        hour = storage.get(f"hour:{self._interface.chat_id}")
-        minute = storage.get(f"minute:{self._interface.chat_id}")
+        hour = storage.get(f"hour:{self._interface.user_id}")
+        minute = storage.get(f"minute:{self._interface.user_id}")
 
         async with self._interface.session.put(
                 "/users/notifications",
@@ -272,7 +270,7 @@ class InputPassword(TextMarkup):
             await self._interface.update_feedback(f"Maximum password length is {MAX_PASSWORD_LENGTH} symbols")
             await self.open()
         else:
-            storage.set(f'password:{self._interface.chat_id}', password)
+            storage.set(f'password:{self._interface.user_id}', password)
             await self._interface.basic_manager.repeat_password.open()
 
 
@@ -296,12 +294,12 @@ class RepeatPassword(TextMarkup):
         )
 
     async def __call__(self, password: str):
-        if password != storage.get(f"password:{self._interface.chat_id}"):
+        if password != storage.get(f"password:{self._interface.user_id}"):
             await self._interface.update_feedback("Passwords not matched")
             await self._interface.basic_manager.input_password.open()
         else:
-            storage.set(f"password_grade:{self._interface.chat_id}", zxcvbn(password))
-            storage.set(f"hash:{self._interface.chat_id}", pbkdf2_sha256.hash(password))
+            storage.set(f"password_grade:{self._interface.user_id}", zxcvbn(password))
+            storage.set(f"hash:{self._interface.user_id}", pbkdf2_sha256.hash(password))
             await self._interface.basic_manager.resume_password.open()
 
 
@@ -341,7 +339,7 @@ class PasswordResume(TextMarkup):
         )
 
     async def open(self):
-        password_grade = storage.get(f'password_grade:{self._interface.chat_id}')
+        password_grade = storage.get(f'password_grade:{self._interface.user_id}')
 
         self.text_map['strength'].data = self._strength_marks[password_grade['score']]
 
@@ -397,8 +395,8 @@ class InputEmail(TextMarkup):
                 await self._interface.update_feedback(f"verify code sent on email:"
                                                       f" {email}.",
                                                       type_='info')
-                storage.setex(f"verify_email_code:{self._interface.chat_id}", VERIFY_CODE_EXPIRATION, verify_code)
-                storage.set(f"email:{self._interface.chat_id}", email)
+                storage.setex(f"verify_email_code:{self._interface.user_id}", VERIFY_CODE_EXPIRATION, verify_code)
+                storage.set(f"email:{self._interface.user_id}", email)
                 await self._interface.basic_manager.input_verify_email_code.open()
             else:
                 await self._interface.update_feedback(f"Email {email} not found", type_="error")
@@ -428,10 +426,10 @@ class InputVerifyEmailCode(TextMarkup):
 
     async def __call__(self, verify_code):
         await self._interface.temp_message()
-        verify_code_ = storage.getex(f"verify_email_code:{self._interface.chat_id}")
+        verify_code_ = storage.getex(f"verify_email_code:{self._interface.user_id}")
         if verify_code_ is None:
-            email = storage.get(f"email:{self._interface.chat_id}")
-            storage.setex(f"verify_email_code:{self._interface.chat_id}", VERIFY_CODE_EXPIRATION, await Mailing.verify_email(email))
+            email = storage.get(f"email:{self._interface.user_id}")
+            storage.setex(f"verify_email_code:{self._interface.user_id}", VERIFY_CODE_EXPIRATION, await Mailing.verify_email(email))
             await self._interface.update_feedback(f"Verify code expired. New code sended on email: {email}", type_="info")
             await self.open()
         elif verify_code != verify_code_:
@@ -472,7 +470,7 @@ class ChangeNotificationsHour(TextMarkup):
         )
 
     async def __call__(self, hour: int):
-        storage.set(f"hour:{self._interface.chat_id}", hour)
+        storage.set(f"hour:{self._interface.user_id}", hour)
         await self._interface.basic_manager.change_notification_minute.open()
 
 
@@ -514,11 +512,19 @@ class ChangeNotificationsMinute(TextMarkup):
         )
 
     async def __call__(self, minute: int):
-        storage.set(f"minute:{self._interface.chat_id}", minute)
+        storage.set(f"minute:{self._interface.user_id}", minute)
         await self._interface.basic_manager.options.update_notifications_time()
 
 
-class AuthenticationWithPassword(TextMarkup):
+class FeedbackMixin:
+    _feedback_headers = {
+        "default": DataTextWidget(header=f'{Emoji.REPORT} Feedback'),
+        "info": DataTextWidget(header=f"{Emoji.INFO} Info"),
+        "error": DataTextWidget(header=f"{Emoji.DENIAL} Error"),
+    }
+
+
+class AuthenticationWithPasswordMarkup(TextMarkup, FeedbackMixin):
     _action = TextWidget(f'{Emoji.KEY} Enter the password')
     _reset_password = ButtonWidget(
         text=f'{Emoji.CYCLE} Reset password',
@@ -541,11 +547,12 @@ class AuthenticationWithPassword(TextMarkup):
         )
 
     async def open(self):
-        markup_map = []
+        markup_map = MarkupMap()
         response = await self.api.get_user()
         if response.status == 200 and (await response.json()).get("email"):
-            markup_map.append(self._reset_password)
-        markup_map.append(self._back)
+            markup_map.add_button_in_new_row(self._reset_password)
+        markup_map.add_button_in_new_row(self._back)
+        self.markup_map = markup_map
 
     async def __call__(self, password: str):
         response = await self.api.authentication(password)
@@ -560,7 +567,7 @@ class AuthenticationWithPassword(TextMarkup):
         response = self._interface.get_user()
         if response is not None:
             verify_code = await Mailing.verify_email((await response.json())["email"])
-            storage.setex(f"verify_email_code:{self._interface.chat_id}", VERIFY_CODE_EXPIRATION, verify_code)
+            storage.setex(f"verify_email_code:{self._interface.user_id}", VERIFY_CODE_EXPIRATION, verify_code)
             await self._interface.update_feedback('Verify code sent on your email', type_="info")
             await self._interface.basic_manager.input_verify_code_reset_password.open()
 
@@ -588,13 +595,13 @@ class InputVerifyCodeResetPassword(TextMarkup):
 
     async def __call__(self, verify_code):
         await self._interface.temp_message()
-        verify_code_ = storage.getex(f"verify_email_code:{self._interface.chat_id}")
+        verify_code_ = storage.getex(f"verify_email_code:{self._interface.user_id}")
         if verify_code_ is None:
             async with self._interface.session.get(
                     f'/get_user_email/{await self._interface.encoded_chat_id()}') as response:
                 if response.status == 200:
                     verify_code = await Mailing.verify_email(await response.text())
-                    storage.setex(f"verify_email_code:{self._interface.chat_id}", VERIFY_CODE_EXPIRATION, verify_code)
+                    storage.setex(f"verify_email_code:{self._interface.user_id}", VERIFY_CODE_EXPIRATION, verify_code)
                     self._interface.update_feedback("Verify code expired. New code sent on your email.", type_="info")
                     await self.open()
                 else:

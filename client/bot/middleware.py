@@ -6,8 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Update, TelegramObject
 from aiohttp import ClientSession
 
-from client.bot import BotControl
-from client.controller import Interface
+from client.bot import BotControl, bot
 
 
 class BuildInterfaceMiddleware(BaseMiddleware):
@@ -17,20 +16,17 @@ class BuildInterfaceMiddleware(BaseMiddleware):
         event: Update,
         data: Dict[str, Any]
     ) -> Any:
-        await self.build_context(data["state"], await self._extract_user_id(event))
+        data["bot_control"] = await self.build_context(await self._extract_user_id(event))
         return await handler(event, data)
 
     @classmethod
-    async def build_context(cls, state: FSMContext, user_id):
-        bot_control = BotControl(user_id)
+    async def build_context(cls, user_id):
+        bot_control = BotControl(user_id, bot)
         if bot_control.storage.is_user_exists is None:
-            bot_control.server.add_user()
-
-
-        if response is not None:
-            interface.state = state
-            await state.update_data({"interface": interface.serialize()})
-            return interface
+            response = await bot_control.server.add_user()
+            if response.status == 201 or response.status == 409:
+                bot_control.storage.is_user_exists = True
+        return bot_control
 
     @classmethod
     async def _extract_user_id(cls, event: Update):

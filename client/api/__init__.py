@@ -38,7 +38,7 @@ class ServerApi:
 
     def __init__(self, bot_control: BotControl):
         self.bot_control = bot_control
-        self.user_id = bot_control.chat_id
+        self.user_id = bot_control.user_id
         self._headers = {
             "Authorization": '',
             "x-service-name": "Psychological",
@@ -78,7 +78,7 @@ class ServerApi:
     @_async_request_middleware
     async def authentication(self, session: ClientSession, password: str):
         async with session.post('/users/login', json={
-            'user_id': self.bot_control.chat_id,
+            'user_id': self.bot_control.user_id,
             "password": password,
         }, headers=self._headers) as response:
             return response

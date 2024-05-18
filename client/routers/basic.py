@@ -5,6 +5,7 @@ from aiogram import Router, F
 from aiogram.filters import StateFilter
 from aiogram.types import Message
 
+from client.markups import MarkupContext
 from client.markups.basic import NotificationMinuteCallbackData, NotificationHourCallbackData
 from client.controller import Interface
 from client.bot.FSM import States
@@ -13,8 +14,8 @@ basic_router = Router()
 
 
 @basic_router.message(CommandStart())
-async def open_tittle_screen(message: Message, interface: Bot):
-
+async def open_tittle_screen(message: Message):
+    MarkupContext()
     await message.delete()
 
 
