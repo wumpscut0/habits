@@ -21,7 +21,7 @@ class BuildBotControl(BaseMiddleware):
     async def _build_bot_control(cls, event, state: FSMContext):
         user_id = await cls._extract_user_id(event)
         bot_control = BotControl(user_id, state)
-        bot_control.storage.first_name = cls._extract_first_name(event)
+        bot_control.storage.first_name = await cls._extract_first_name(event)
         return bot_control
 
     @classmethod

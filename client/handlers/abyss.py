@@ -1,29 +1,33 @@
 from aiogram import Router, F
-from aiogram.filters import StateFilter, Command
-from aiogram.types import Message, BotCommand
+from aiogram.types import CallbackQuery, Message
 
-from client.bot import BotControl, BotCommands
-from client.markups.basic import Jobs
-from client.markups.core import TextMessage, TextWidget
-from client.utils.scheduler import scheduler
+from client.bot import BotControl
+from client.markups import TextMessageMarkup, TextWidget, ButtonWidget
+from client.markups.basic import TitleScreen, Info, Conform
 
 abyss_router = Router()
 
 
-@abyss_router.message(BotCommands.exit)
-async def exit_(message: Message, bot_control: BotControl):
-    text_message = TextMessage()
-    text_message.add_text_row(TextWidget('Good by!'))
-    await bot_control.update_interface(text_message)
+@abyss_router.callback_query(F.data == "close_info")
+async def close_info(callback: CallbackQuery, bot_control: BotControl):
+    await bot_control.refresh_context()
+
+
+@abyss_router.callback_query()
+async def callback_abyss(callback: CallbackQuery, bot_control: BotControl):
+    await bot_control.update_text_message(await Info("Sorry. This button no working so far.").init(), context=False)
+
+
+@abyss_router.message()
+async def abyss(message: Message, bot_control: BotControl):
+    await bot_control.update_text_message(await Conform(
+        "Do you want to send message your psychotherapist?",
+        "abyss_yes",
+        "abyss_no"
+    ).init())
     await message.delete()
 
 
-@abyss_router.message(BotCommands.jobs)
-async def jobs(message: Message, bot_control: BotControl):
-    await bot_control.update_interface(await Jobs().init(), temp=True)
-    await message.delete()
-
-
-@abyss_router.message(StateFilter(None), ~F.text.in_(BotCommands.str_commands()))
-async def abyss(message: Message):
-    await message.delete()
+@abyss_router.callback_query(F.data == "abyss_yes")
+async def deep_abyss(message: Message, bot_control: BotControl):
+    await bot_control.update_text_message(Te)

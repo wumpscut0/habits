@@ -12,15 +12,7 @@ from client.markups.basic import TitleScreen
 basic_router = Router()
 
 
-@basic_router.message(CommandStart())
-async def open_tittle_screen(message: Message, bot_control: BotControl):
-    if bot_control.storage.is_user_exists is None:
-        response = await bot_control.api.add_user(bot_control.user_id)
-        if response.status == 201 or response.status == 409:
-            bot_control.storage.is_user_exists = True
-    await bot_control.delete_interface()
-    await bot_control.create_interface(await TitleScreen().init(bot_control.user_id))
-    await message.delete()
+
 
 
 # @basic_router.callback_query(F.data == 'title_screen')

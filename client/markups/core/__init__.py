@@ -1,3 +1,4 @@
+from abc import abstractmethod, ABC
 from typing import List
 
 from aiogram.filters.callback_data import CallbackData
@@ -7,11 +8,40 @@ from aiogram.types import InputMediaPhoto
 from aiogram.utils.formatting import as_list, Text, Bold, Italic
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from client.api import ServerApi
 from client.utils import Emoji
 
 
+class InitializeMarkupInterface(ABC):
+    api = ServerApi()
+
+    @abstractmethod
+    def __init__(self, state: State | None = None):
+        self.text_message_markup = TextMessageMarkup(state)
+        """
+        super().__init__()
+        `self.<widget_name> = TextWidget("hello"),`
+        """
+        ...
+
+    @abstractmethod
+    async def init(self, *args, **kwargs):
+        """
+        self.text_message.add_text_row(self.<widget_name>)\n
+        return self.text_message
+        """
+        ...
+
+
 class TextWidget:
-    def __init__(self, text: str = None):
+    def __init__(
+            self,
+            *,
+            mark: str = '',
+            text: str = None,
+
+    ):
+        self.mark = mark
         self._text = text
 
     def __repr__(self):
@@ -21,66 +51,48 @@ class TextWidget:
     def text(self):
         if self._text is None:
             return Text(Emoji.BAN)
-
-        return Bold(self._text)
+        separator = '' if str(self._text).startswith(' ') else ' '
+        return Text(self.mark) + Text(separator) + Bold(self._text)
 
     @text.setter
     def text(self, value):
         self._text = value
 
 
-class DataTextWidget:
+class DataTextWidget(TextWidget):
     def __init__(
             self,
             *,
-            header: str = None,
-            data: str = Emoji.GREY_QUESTION,
             mark: str = '',
+            text: str = None,
+            data: str = Emoji.GREY_QUESTION,
             sep: str = ': ',
             end: str = '',
     ):
-        self.header = header
+        super().__init__(
+            mark=mark,
+            text=text,
+        )
         self.data = data
-        self.mark = mark
         self.sep = sep
         self.end = end
 
-    def __repr__(self):
-        return self.text.as_html()
-
-    @property
     def text(self):
-        if self.header is None:
-            return Text(Emoji.BAN)
-
-        separator = '' if str(self.header).startswith(' ') else ' '
-        return Text(self.mark) + Text(separator) + Bold(self.header) + Text(self.sep) + Italic(self.data) + Italic(
-            self.end)
+        return super().text + Text(self.sep) + Italic(self.data) + Italic(self.end)
 
 
-class ButtonWidget:
+class ButtonWidget(TextWidget):
     def __init__(
-            self,
-            *,
-            text: str = None,
-            callback_data: str | CallbackData = None,
+            self, *,
             mark: str = '',
+            text: str = None,
+            callback_data: str | CallbackData = None
     ):
-        self._text = text
+        super().__init__(
+            mark=mark,
+            text=text,
+        )
         self._callback_data = callback_data
-        self.mark = mark
-
-    @property
-    def text(self):
-        if not self._text:
-            return Emoji.BAN
-
-        separator = '' if self._text.startswith(' ') else ' '
-        return self.mark + separator + self._text
-
-    @text.setter
-    def text(self, text):
-        self._text = text
 
     @property
     def callback_data(self):
@@ -93,7 +105,7 @@ class ButtonWidget:
         self._callback_data = callback_data
 
 
-class TextMap:
+class TextMarkup:
     def __init__(self, map_: List[DataTextWidget | TextWidget] | None = None):
         super().__init__()
         self._text_map = [] if map_ is None else map_
@@ -104,6 +116,10 @@ class TextMap:
     def add_text_row(self, text: DataTextWidget | TextWidget):
         self._text_map.append(text)
 
+    def add_texts_rows(self, *args: DataTextWidget | TextWidget):
+        for text in args:
+            self._text_map.append(text)
+
     @property
     def text(self):
         if not self._text_map:
@@ -111,7 +127,7 @@ class TextMap:
         return (as_list(*[text.text for text in self._text_map])).as_html()
 
 
-class MarkupMap:
+class KeyboardMarkup:
     """
     Max telegram inline keyboard buttons row is 8.
      add_button_in_last_row will automatically move the button to the new row
@@ -131,8 +147,23 @@ class MarkupMap:
         else:
             self._markup_map[-1].append(button)
 
+    def add_buttons_in_last_row(self, *args: ButtonWidget):
+        for button in args:
+            self.add_button_in_last_row(button)
+
     def add_button_in_new_row(self, button: ButtonWidget):
         self._markup_map.append([button])
+
+    def add_buttons_in_new_row(self, *args: ButtonWidget):
+        self._markup_map.append([])
+        limit = 0
+        for button in args:
+            if limit == self._limitation_row:
+                limit = 0
+                self.add_button_in_new_row(button)
+            else:
+                self.add_button_in_last_row(button)
+            limit += 1
 
     @property
     def markup(self):
@@ -148,13 +179,13 @@ class MarkupMap:
         return markup.as_markup()
 
 
-class TextMessage(TextMap, MarkupMap):
+class TextMessageMarkup(TextMarkup, KeyboardMarkup):
     def __init__(self, state: State | None = None):
         super().__init__()
         self.state = state
 
 
-class PhotoMessage(TextMessage):
+class PhotoMessageMarkup(TextMessageMarkup):
     def __init__(self, photo: str | InputMediaPhoto):
         super().__init__()
         self.photo = photo

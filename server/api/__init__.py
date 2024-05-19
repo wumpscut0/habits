@@ -28,4 +28,4 @@ async def error_abyss(request: Request, call_next):
         return await call_next(request)
     except Exception as e:
         errors.critical(f"{call_next.__name__}\n{e}")
-        raise HTTPException(500, "Internal server error")
+        print(e)

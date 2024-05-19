@@ -41,21 +41,22 @@ class UserIdApiModel(BaseModel):
 
 class UserApiModel(BaseModel):
     user_id: str
-    hash: str
-    email: str
+    hash: str | None = None
+    email: str | None = None
 
     @async_field_validator('email')
     async def email_validate(self, value: str):
-        if len(value) > MAX_EMAIL_LENGTH:
-            raise HTTPException(
-                400,
-                detail=f'Maximum email length is {MAX_EMAIL_LENGTH}'
-            )
-        if not re.fullmatch(r'[a-zA-Z0-9]+@[a-zA-Z]+\.[a-zA-Z]', value):
-            raise HTTPException(
-                400,
-                detail=f'Invalid email format'
-            )
+        if value is not None:
+            if len(value) > MAX_EMAIL_LENGTH:
+                raise HTTPException(
+                    400,
+                    detail=f'Maximum email length is {MAX_EMAIL_LENGTH}'
+                )
+            if not re.fullmatch(r'[a-zA-Z0-9]+@[a-zA-Z]+\.[a-zA-Z]', value):
+                raise HTTPException(
+                    400,
+                    detail=f'Invalid email format'
+                )
 
     @async_field_validator('user_id')
     async def user_id_validate(self, value: str):

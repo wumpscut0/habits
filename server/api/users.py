@@ -24,9 +24,9 @@ async def user_auth(token: Annotated[Token, Depends(Authority.user_authenticate)
 
 
 @users_router.get('/{user_id}')
-async def get_user(user_id: Annotated[bytes, Depends(Authority.decrypt_message)]):
+async def get_user(user_id: str):
     async with Session.begin() as session:
-        return await UserQueries.get_user(session, str(user_id))
+        return await UserQueries.get_user(session, (await Authority.decrypt_message(user_id)).decode())
 
 
 @users_router.get('/')

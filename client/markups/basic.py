@@ -1,5 +1,6 @@
 import re
 from abc import ABC, abstractmethod
+from asyncio import sleep
 
 from aiogram.filters.callback_data import CallbackData
 from passlib.handlers.pbkdf2 import pbkdf2_sha256
@@ -7,12 +8,11 @@ from zxcvbn import zxcvbn
 
 from client.api import ServerApi
 from client.bot.FSM import States
-from client.markups import MarkupInitializeInterface, Info
-from client.markups.core import TextMap, TextWidget, MarkupMap, ButtonWidget, DataTextWidget, TextMessage
+from client.markups.core import TextMarkup, TextWidget, KeyboardMarkup, ButtonWidget, DataTextWidget, TextMessageMarkup, \
+    InitializeMarkupInterface
 
 from client.utils import Emoji, config
 from client.utils.mailing import Mailing
-from client.utils.scheduler import scheduler
 
 MAX_EMAIL_LENGTH = config.getint('limitations', 'MAX_EMAIL_LENGTH')
 MAX_NAME_LENGTH = config.getint('limitations', 'MAX_NAME_LENGTH')
@@ -24,10 +24,10 @@ STANDARD_BORDER_RANGE = config.getint('limitations', "STANDARD_BORDER_RANGE")
 VERIFY_CODE_EXPIRATION = config.getint("limitations", "VERIFY_CODE_EXPIRATION")
 
 
-class TitleScreen(MarkupInitializeInterface):
+class TitleScreen(InitializeMarkupInterface):
     def __init__(self):
         super().__init__()
-        self._info = TextWidget(f"{Emoji.BRAIN} Psychological service")
+        self._info = TextWidget(text=f"{Emoji.BRAIN} Psychological service")
         self._sign_in = ButtonWidget(text=f'{Emoji.DOOR} Sign in', callback_data='authorization')
         self._notifications = ButtonWidget(
             text="Notifications",
@@ -36,17 +36,15 @@ class TitleScreen(MarkupInitializeInterface):
         )
 
     async def init(self, user_id: str):
-        text_message = TextMessage()
-        text_message.add_text_row(self._info)
-        text_message.add_button_in_new_row(self._sign_in)
+        self.text_message_markup.add_text_row(self._info)
+        self.text_message_markup.add_button_in_new_row(self._sign_in)
         await self._up_to_date_notification(user_id)
-        text_message.add_button_in_new_row(self._notifications)
-        return text_message
+        self.text_message_markup.add_button_in_new_row(self._notifications)
+        return self.text_message_markup
 
     async def _up_to_date_notification(self, user_id: str):
-        response = await self.api.get_user(user_id)
-        if response.status == 200:
-            user = await response.json()
+        user = await self.api.get_user(user_id)
+        if user is not None:
             if user["notifications"]:
                 self._notifications.mark = Emoji.BELL
             else:
@@ -56,49 +54,99 @@ class TitleScreen(MarkupInitializeInterface):
             self._notifications.mark = Emoji.RED_QUESTION
 
     async def invert_notifications(self, user_id: str):
-        await self.api.invert_notifications(user_id=user_id)
+        await self.api.invert_notifications(user_id)
 
 
-class Jobs(Info, MarkupInitializeInterface):
-    def __init__(self):
+class Info(InitializeMarkupInterface):
+    def __init__(self, info: str, button_text="Ok", callback_data="close_info"):
         super().__init__()
-        self._jobs = DataTextWidget(header='Jobs', sep=":\n")
+        self._info = TextWidget(text=f"{info} {Emoji.CRYING_CAT}")
+        self._ok = ButtonWidget(text=button_text, callback_data=callback_data)
 
     async def init(self):
-        text_message = TextMessage()
-        self._up_to_date_jobs()
-        text_message.add_text_row(self._jobs)
-        text_message.add_button_in_new_row(self._ok)
-        return text_message
-
-    def _up_to_date_jobs(self):
-        current_jobs = scheduler.get_jobs()
-        jobs_ = ''
-        for job in current_jobs:
-            jobs_ += job.name + ': ' + str(job.next_run_time) + '\n'
-        self._jobs.data = jobs_
+        self.text_message_markup.add_text_row(self._info)
+        self.text_message_markup.add_button_in_last_row(self._ok)
+        return self.text_message_markup
 
 
-class Temp(MarkupInitializeInterface):
+class Temp(InitializeMarkupInterface):
     def __init__(self):
         super().__init__()
-        self._temp = TextWidget("Processing...")
+        self._temp = TextWidget(text=f"{Emoji.HOURGLASS_START} Processing...")
+
+    async def init(self):
+        self.text_message_markup.add_text_row(self._temp)
+        return self.text_message_markup
+
+
+class Back(InitializeMarkupInterface):
+    def __init__(self, callback_data: str | CallbackData, mark=f"{Emoji.BACK}", text="Back"):
+        super().__init__()
+        self._back = ButtonWidget(mark=mark, text=text, callback_data=callback_data)
 
     def init(self):
-        text_message = TextMessage()
-        text_message.add_text_row(self._temp)
-        return text_message
+        self.text_message_markup.add_button_in_new_row(self._back)
+        return self.text_message_markup
 
-class Remind(Info, MarkupInitializeInterface):
-    remainder_text = Bold('Don`t forget mark done target today').as_html()
-    remainder_markup = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text=f'{Emoji.OK} Ok', callback_data="close_notification"),
-            ]
-        ]
-    )
-    async def init(self, *args, **kwargs):
+
+class Pagination(InitializeMarkupInterface):
+    def __init__(
+        self,
+        left_callback_data: str | CallbackData,
+        right_callback_data: str | CallbackData,
+        left_mark: str = "",
+        right_mark: str = ""
+
+    ):
+        super().__init__()
+        self._left = ButtonWidget(text=f"{Emoji.LEFT}", mark=left_mark, callback_data=left_callback_data)
+        self._right = ButtonWidget(text=f"{Emoji.RIGHT}", mark=right_mark, callback_data=right_callback_data)
+
+    def init(self):
+        self.text_message_markup.add_buttons_in_last_row(self._left, self._right)
+        return self.text_message_markup
+
+
+class LeftBackRight(Back, Pagination):
+    def __init__(
+        self,
+        callback_data: str | CallbackData,
+        left_callback_data: str | CallbackData,
+        right_callback_data: str | CallbackData,
+        left_mark: str = "",
+        right_mark: str = ""
+    ):
+
+
+
+class Input(InitializeMarkupInterface):
+    def __init__(self):
+        super().__init__()
+        self._temp = TextWidget(text=f"{Emoji.HOURGLASS_START} Processing...")
+        self._
+
+    async def init(self):
+        self.text_message_markup.add_text_row(self._temp)
+        return self.text_message_markup
+
+
+class Conform(InitializeMarkupInterface):
+    def __init__(
+            self,
+            info: str,
+            yes_callback_data: str | CallbackData,
+            no_callback_data: str | CallbackData
+    ):
+        super().__init__()
+        self._info = TextWidget(text=info)
+        self._yes = ButtonWidget(text=f"{Emoji.OK} Yes", callback_data=yes_callback_data)
+        self._no = ButtonWidget(text=f"{Emoji.DENIAL} No", callback_data=no_callback_data)
+
+    async def init(self):
+        self.text_message_markup.add_texts_rows(self._info)
+        self.text_message_markup.add_buttons_in_new_row(self._yes, self._no)
+        return self.text_message_markup
+
 
 
 # class Profile(TextMarkup):

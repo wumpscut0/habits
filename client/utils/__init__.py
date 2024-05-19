@@ -45,6 +45,15 @@ class Emoji:
     NEW = "🆕"
     TROPHY = "🏆"
     CLOCK = "🕒"
+    FROG = "🐸"
+    HOURGLASS_START = "⏳"
+    HOURGLASS_END = "⌛️"
+    MOYAI = "🗿"
+    CLOWN = "🤡"
+    WHEELCHAIR = "♿️"
+    CRYING_CAT = "😿"
+    LEFT = "⬅"
+    RIGHT = "➡"
 
 
 class SerializableMixin:

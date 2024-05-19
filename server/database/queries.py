@@ -36,7 +36,10 @@ class UserQueries:
 
     @staticmethod
     async def get_user(session: AsyncSession, user_id: str):
-        return (await session.get(UserORM, ident=user_id)).as_dict_()
+        user = await session.get(UserORM, ident=user_id)
+        if user is None:
+            raise HTTPException(404)
+        return user.as_dict_()
 
 
 class PasswordQueries:
@@ -106,13 +109,10 @@ class TargetsQueries:
 
     @staticmethod
     async def get_target(session: AsyncSession, target_id: int):
-        target = (await session.execute(
-            select(TargetORM)
-            .where(TargetORM.id == target_id)
-        )).scalar_one_or_none()
+        target = await session.get(TargetORM, ident=target_id)
         if target is None:
             raise HTTPException(404)
-        return target
+        return target.as_dict_
 
     @staticmethod
     async def update(session: AsyncSession, target_id: int, **kwargs):
@@ -148,6 +148,3 @@ class TargetsQueries:
         await session.execute(update(TargetORM).values({"completed_datetime": datetime.now()}).filter(
             TargetORM.progress == TargetORM.border_progress, TargetORM.completed_datetime is None
         ))
-        sub = select(TargetORM.user_id).filter(not TargetORM.completed)
-        return (await session.execute(select(UserORM.id)
-                               .filter(UserORM.notifications, UserORM.id in sub))).scalars()

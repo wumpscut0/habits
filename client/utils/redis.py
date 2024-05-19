@@ -4,7 +4,7 @@ from typing import Union, Any
 
 from redis import Redis
 from redis.commands.core import ResponseT
-from redis.typing import KeyT, EncodableT, ExpiryT, AbsExpiryT
+from redis.typing import KeyT, ExpiryT, AbsExpiryT
 
 from client.utils import config
 
@@ -15,7 +15,7 @@ class CustomRedis(Redis):
     def set(
         self,
         name: KeyT,
-        value: EncodableT,
+        value: Any,
         ex: Union[ExpiryT, None] = None,
         px: Union[ExpiryT, None] = None,
         nx: bool = False,
@@ -34,7 +34,7 @@ class CustomRedis(Redis):
         if result is not None:
             return pickle.loads(result)
 
-    def setex(self, name: KeyT, time: ExpiryT, value: EncodableT) -> ResponseT:
+    def setex(self, name: KeyT, time: ExpiryT, value: Any) -> ResponseT:
         return super().setex(
             name, time, pickle.dumps(value),
         )
@@ -53,6 +53,28 @@ class CustomRedis(Redis):
             return pickle.loads(result)
 
 
+class HourGlassAnimationIdsPull:
+    storage = CustomRedis(host=os.getenv("REDIS_HOST"), port=int(os.getenv("REDIS_PORT")), db=1)
+
+    @property
+    def pull(self):
+        return self.storage.get(f"hour_glass_animation_pull")
+
+    def add_id(self, animation_id: str):
+        pull = self.pull
+        pull.add(animation_id)
+        self.pull = pull
+
+    def remove_id(self, animation_id: str):
+        pull = self.pull
+        pull.add(animation_id)
+        self.pull = pull
+
+    @pull.setter
+    def pull(self, data: set[str]):
+        self.storage.set(f"hour_glass_animation_pull", data)
+
+
 class Storage:
     storage = CustomRedis(host=os.getenv("REDIS_HOST"), port=int(os.getenv("REDIS_PORT")), db=1)
 
@@ -60,28 +82,12 @@ class Storage:
         self.user_id = user_id
 
     @property
-    def current_interface(self):
-        return self.storage.get(f"current_interface:{self.user_id}")
+    def current_text_message_markup(self):
+        return self.storage.get(f"current_text_message_markup:{self.user_id}")
 
-    @current_interface.setter
-    def current_interface(self, data: Any):
-        self.storage.set(f"current_interface:{self.user_id}", data)
-
-    @property
-    def temp_interface(self):
-        return self.storage.get(f"temp_interface:{self.user_id}")
-
-    @temp_interface.setter
-    def temp_interface(self, data: Any):
-        self.storage.set(f"temp_interface:{self.user_id}", data)
-
-    @property
-    def is_user_exists(self):
-        return self.storage.get(f"is_user_exists:{self.user_id}")
-
-    @is_user_exists.setter
-    def is_user_exists(self, data: Any):
-        self.storage.set(f"is_user_exists:{self.user_id}", data)
+    @current_text_message_markup.setter
+    def current_text_message_markup(self, data: Any):
+        self.storage.set(f"current_text_message_markup:{self.user_id}", data)
 
     @property
     def first_name(self):
@@ -108,14 +114,6 @@ class Storage:
         self.storage.set(f"token:{self.user_id}", data)
 
     @property
-    def message_id(self):
-        return self.storage.get(f"message_id:{self.user_id}")
-
-    @message_id.setter
-    def message_id(self, data: Any):
-        self.storage.set(f"message_id:{self.user_id}", data)
-
-    @property
     def hour(self):
         return self.storage.get(f"hour:{self.user_id}")
 
@@ -132,12 +130,35 @@ class Storage:
         self.storage.set(f"minute:{self.user_id}", data)
 
     @property
-    def trash(self):
-        return self.storage.get(f"trash:{self.user_id}")
+    def message_ids_pull(self):
+        pull = self.storage.get(f"message_ids_pull:{self.user_id}")
+        if pull is None:
+            return []
+        return pull
 
-    @trash.setter
-    def trash(self, data: Any):
-        self.storage.set(f"trash:{self.user_id}", data)
+    @property
+    def last_message_id(self):
+        try:
+            return self.message_ids_pull[-1]
+        except IndexError:
+            pass
+
+    def add_message_id_to_the_pull(self, message_id: int):
+        pull = self.message_ids_pull
+        pull.append(message_id)
+        self.message_ids_pull = pull
+
+    def pop_last_message_id_from_the_pull(self):
+        pull = self.message_ids_pull
+        try:
+            pull.pop()
+            self.message_ids_pull = pull
+        except IndexError:
+            pass
+
+    @message_ids_pull.setter
+    def message_ids_pull(self, data: Any):
+        self.storage.set(f"message_ids_pull:{self.user_id}", data)
 
     @property
     def verify_code(self):

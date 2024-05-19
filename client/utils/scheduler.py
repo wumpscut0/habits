@@ -1,45 +1,78 @@
-import os
-
-import aiohttp
-
-from aiogram.types import InlineKeyboardButton
-from aiogram.utils.formatting import Bold
-from aiogram.types.inline_keyboard_markup import InlineKeyboardMarkup
+from apscheduler.jobstores.base import JobLookupError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.redis import RedisJobStore
+from apscheduler.triggers.cron import CronTrigger
 
+from client.api import ServerApi
 from client.bot import BotControl
-from client.utils import Emoji
+from client.markups.basic import Info
 from client.utils.loggers import info, errors
-from client.utils.redis import Storage
+from client.utils.redis import HourGlassAnimationIdsPull
 
 
+class Scheduler:
+    _jobstores = {
+        'default': RedisJobStore(db=2)
+    }
+    _job_defaults = {
+        'coalesce': False,
+        'max_instances': 1
+    }
+    scheduler = AsyncIOScheduler()
+    scheduler.configure(jobstores=_jobstores, job_defaults=_job_defaults)
 
+    _increase_progress_id = "increase_progress"
+    _api = ServerApi()
+    _hour_glass_animation_ids_pull = HourGlassAnimationIdsPull()
 
-async def remainder(chat_id: int):
-    info.info(f'Remaining sent to user {chat_id}')
-    await BotControl(chat_id).create_interface(trash=True, temp=True)
+    @classmethod
+    def set_job_increase_progress(cls, hour=0, minute=0):
+        cls.scheduler.add_job(
+            Workers.increase_progress,
+            'cron',
+            id=cls._increase_progress_id,
+            replace_existing=True,
+            hour=hour,
+            minute=minute,
+        )
 
-
-async def increase_progress():
-    async with aiohttp.ClientSession() as session:
-        async with session.patch(
-                os.getenv('BACKEND') + f'/targets/progress',
-                headers={"Authorization": await Storage.storage.get("service_key")}
-        ) as response:
-            if response.status == 200:
-                info.info(f'Progress increased')
-                for user_id in (await response.json()):
-                    scheduler.add_job(remainder, args=(user_id,), replace_existing=True, id=user_id)
+    @classmethod
+    async def refresh_notifications(cls, user_id: str):
+        user_response = await cls._api.get_user(user_id)
+        targets_response = await cls._api.get_targets(user_id)
+        if user_response.status == 200 and targets_response.status == 200:
+            user = (await user_response.json())
+            targets = (await targets_response.json())
+            all_done = True
+            for target in targets:
+                if not target["completed"]:
+                    all_done = False
+                    break
+            if user["notifications"] and not all_done:
+                time_ = user["notification_time"]
+                cls.scheduler.add_job(
+                    func=Workers.remainder,
+                    trigger=CronTrigger(hour=time_["hour"], minute=time_["minute"]),
+                    args=(int(user_id),), replace_existing=True, id=user_id
+                )
             else:
-                errors.error(f"Progress not increased. Status {response.status}")
+                try:
+                    cls.scheduler.remove_job(job_id=user_id, jobstore="default")
+                except JobLookupError:
+                    pass
 
 
-jobstores = {
-    'default': RedisJobStore(db=2)
-}
+class Workers:
+    @staticmethod
+    async def remainder(user_id: int):
+        await BotControl(user_id).create_text_message(await Info('Don`t forget mark done target today').init(), context=False)
+        info.info(f'Remaining sent to user {user_id}')
 
-scheduler = AsyncIOScheduler()
-scheduler.configure(jobstores=jobstores)
-
-scheduler.add_job(increase_progress, 'cron', hour=14, minute=15, replace_existing=True, id="increase_progress")
+    @staticmethod
+    async def increase_progress():
+        api = ServerApi()
+        response = await api.increase_progress()
+        if response.status == 200:
+            info.info(f'Progress increased')
+        else:
+            errors.error(f"Progress not increased. Status: {response.status}")

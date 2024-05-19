@@ -3,7 +3,7 @@ import re
 from aiogram.filters.callback_data import CallbackData
 
 from client.bot.FSM import States
-from client.markups.core import TextMap, DataTextWidget, MarkupMap, ButtonWidget, TextWidget
+from client.markups.core import TextMarkup, DataTextWidget, KeyboardMarkup, ButtonWidget, TextWidget
 
 from client.utils import config, Emoji
 
@@ -18,27 +18,6 @@ STANDARD_BORDER_RANGE = config.getint('limitations', "STANDARD_BORDER_RANGE")
 
 class ShowTargetCallbackData(CallbackData, prefix='show_target'):
     id: int
-
-
-# class TargetsManager:
-#     def __init__(self, interface):
-#         self._interface = interface
-#
-#         self.targets_control = TargetsControl(interface)
-#
-#         self.targets = Targets(interface)
-#         self.target = Target(interface)
-#
-#         self.completed_targets = CompletedTargets(interface)
-#         self.completed_target = CompletedTarget(interface)
-#
-#         self.input_target_name = InputTargetName(interface)
-#         self.input_target_border = InputTargetBorder(interface)
-#
-#         self.update_target_name = UpdateTargetName(interface)
-#         self.update_target_description = UpdateTargetDescription(interface)
-#
-#         self.conform_delete_target = ConformDeleteTarget(interface)
 #
 #
 # class TargetsControl(TextMarkup):

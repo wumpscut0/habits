@@ -25,7 +25,7 @@ class Authority:
     _cipher = Fernet(os.getenv('CIPHER'))
 
     @classmethod
-    async def decrypt_message(cls, data: str):
+    async def decrypt_message(cls, data: bytes | str):
         try:
             return cls._cipher.decrypt(data)
         except (InvalidToken, Exception):
