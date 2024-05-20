@@ -19,7 +19,7 @@ async def callback_abyss(callback: CallbackQuery, bot_control: BotControl):
 
 
 @abyss_router.message()
-async def abyss(message: Message, bot_control: BotControl):
+async def message_abyss(message: Message, bot_control: BotControl):
     await bot_control.update_text_message(await Conform(
         "Do you want to send message your psychotherapist?",
         "abyss_yes",
@@ -29,5 +29,5 @@ async def abyss(message: Message, bot_control: BotControl):
 
 
 @abyss_router.callback_query(F.data == "abyss_yes")
-async def deep_abyss(message: Message, bot_control: BotControl):
-    await bot_control.update_text_message(Te)
+async def abyss(callback: CallbackQuery, bot_control: BotControl):
+    await bot_control.update_text_message()

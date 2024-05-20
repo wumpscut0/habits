@@ -94,6 +94,7 @@ class ButtonWidget(TextWidget):
         )
         self._callback_data = callback_data
 
+
     @property
     def callback_data(self):
         if not self._callback_data:
@@ -109,6 +110,10 @@ class TextMarkup:
     def __init__(self, map_: List[DataTextWidget | TextWidget] | None = None):
         super().__init__()
         self._text_map = [] if map_ is None else map_
+
+    @property
+    def text_map(self):
+        return self._text_map
 
     def set_text_map(self, map_: List[DataTextWidget | TextWidget]):
         self._text_map = map_
@@ -130,32 +135,36 @@ class TextMarkup:
 class KeyboardMarkup:
     """
     Max telegram inline keyboard buttons row is 8.
-     add_button_in_last_row will automatically move the button to the new row
+     add_button(s)_in_last_row will automatically move the button to the new row
     """
     _limitation_row = 8
 
     def __init__(self, map_: List[List[ButtonWidget]] | None = None):
         super().__init__()
-        self._markup_map = [[]] if map_ is None else map_
+        self._keyboard_map = [[]] if map_ is None else map_
+
+    @property
+    def keyboard_map(self):
+        return self._keyboard_map
 
     def set_markup_map(self, map_: List[List[ButtonWidget]]):
-        self._markup_map = map_
+        self._keyboard_map = map_
 
     def add_button_in_last_row(self, button: ButtonWidget):
-        if len(self._markup_map[-1]) == self._limitation_row:
+        if len(self._keyboard_map[-1]) == self._limitation_row:
             self.add_button_in_new_row(button)
         else:
-            self._markup_map[-1].append(button)
+            self._keyboard_map[-1].append(button)
 
     def add_buttons_in_last_row(self, *args: ButtonWidget):
         for button in args:
             self.add_button_in_last_row(button)
 
     def add_button_in_new_row(self, button: ButtonWidget):
-        self._markup_map.append([button])
+        self._keyboard_map.append([button])
 
     def add_buttons_in_new_row(self, *args: ButtonWidget):
-        self._markup_map.append([])
+        self._keyboard_map.append([])
         limit = 0
         for button in args:
             if limit == self._limitation_row:
@@ -166,12 +175,12 @@ class KeyboardMarkup:
             limit += 1
 
     @property
-    def markup(self):
-        if self._markup_map == [[]]:
+    def keyboard(self):
+        if self._keyboard_map == [[]]:
             return
 
         markup = InlineKeyboardBuilder()
-        for buttons_row in self._markup_map:
+        for buttons_row in self._keyboard_map:
             row = InlineKeyboardBuilder()
             for button in buttons_row:
                 row.button(text=button.text, callback_data=button.callback_data)
@@ -183,6 +192,14 @@ class TextMessageMarkup(TextMarkup, KeyboardMarkup):
     def __init__(self, state: State | None = None):
         super().__init__()
         self.state = state
+
+    def __add__(self, text_message_markup):
+        if not isinstance(text_message_markup, TextMessageMarkup):
+            raise ValueError("TextMessageMarkup can only concatenate with TextMessageMarkup")
+        for text_row in text_message_markup.text_map:
+            self.add_text_row(text_row)
+        for buttons_row in text_message_markup.keyboard_map:
+            self.add_buttons_in_new_row(*buttons_row)
 
 
 class PhotoMessageMarkup(TextMessageMarkup):

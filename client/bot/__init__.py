@@ -69,7 +69,7 @@ class BotControl:
             message = await self.bot.send_message(
                 chat_id=self._user_id,
                 text=text_message_markup.text,
-                reply_markup=text_message_markup.markup
+                reply_markup=text_message_markup.keyboard
             )
             self.storage.add_message_id_to_the_pull(message.message_id)
         except TelegramBadRequest:
@@ -95,7 +95,7 @@ class BotControl:
                 chat_id=self._user_id,
                 message_id=last_message_id,
                 text=text_message_markup.text,
-                reply_markup=text_message_markup.markup
+                reply_markup=text_message_markup.keyboard
             )
 
         except TelegramBadRequest:

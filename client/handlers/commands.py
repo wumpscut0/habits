@@ -3,7 +3,7 @@ from aiogram.filters import StateFilter, Command
 from aiogram.types import Message, BotCommand
 
 from client.bot import BotControl, BotCommands
-from client.markups.basic import TitleScreen, Temp
+from client.markups.basic import TitleScreen, SimpleText
 from client.markups.core import TextMessageMarkup, TextWidget
 from client.utils.scheduler import Jobs
 

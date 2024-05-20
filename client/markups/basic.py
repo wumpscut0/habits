@@ -69,23 +69,32 @@ class Info(InitializeMarkupInterface):
         return self.text_message_markup
 
 
+class SimpleText(InitializeMarkupInterface):
+    def __init__(self, text: str, mark=""):
+        super().__init__()
+        self.simple_text = TextWidget(mark=mark, text=text)
+
+    async def init(self):
+        self.text_message_markup.add_text_row(self.simple_text)
+        return self.text_message_markup
+
+
 class Temp(InitializeMarkupInterface):
     def __init__(self):
         super().__init__()
-        self._temp = TextWidget(text=f"{Emoji.HOURGLASS_START} Processing...")
 
     async def init(self):
-        self.text_message_markup.add_text_row(self._temp)
+        self.text_message_markup + await SimpleText(f"{Emoji.HOURGLASS_START} Processing...").init()
         return self.text_message_markup
 
 
 class Back(InitializeMarkupInterface):
-    def __init__(self, callback_data: str | CallbackData, mark=f"{Emoji.BACK}", text="Back"):
+    def __init__(self, *, callback_data: str | CallbackData, mark=f"{Emoji.BACK}", text="Back"):
         super().__init__()
-        self._back = ButtonWidget(mark=mark, text=text, callback_data=callback_data)
+        self.back = ButtonWidget(mark=mark, text=text, callback_data=callback_data)
 
     def init(self):
-        self.text_message_markup.add_button_in_new_row(self._back)
+        self.text_message_markup.add_button_in_new_row(self.back)
         return self.text_message_markup
 
 
@@ -99,35 +108,61 @@ class Pagination(InitializeMarkupInterface):
 
     ):
         super().__init__()
-        self._left = ButtonWidget(text=f"{Emoji.LEFT}", mark=left_mark, callback_data=left_callback_data)
-        self._right = ButtonWidget(text=f"{Emoji.RIGHT}", mark=right_mark, callback_data=right_callback_data)
+        self.left = ButtonWidget(text=f"{Emoji.LEFT}", mark=left_mark, callback_data=left_callback_data)
+        self.right = ButtonWidget(text=f"{Emoji.RIGHT}", mark=right_mark, callback_data=right_callback_data)
 
     def init(self):
-        self.text_message_markup.add_buttons_in_last_row(self._left, self._right)
+        self.text_message_markup.add_buttons_in_last_row(self.left, self.right)
         return self.text_message_markup
 
 
-class LeftBackRight(Back, Pagination):
+class LeftBackRight(InitializeMarkupInterface):
     def __init__(
         self,
-        callback_data: str | CallbackData,
+        back_callback_data: str | CallbackData,
         left_callback_data: str | CallbackData,
         right_callback_data: str | CallbackData,
         left_mark: str = "",
         right_mark: str = ""
     ):
+        super().__init__()
+        self.back_callback_data = back_callback_data
+        self.left_callback_data = left_callback_data
+        self.right_callback_data = right_callback_data
+        self.left_mark = left_mark
+        self.right_mark = right_mark
 
+    def init(self, *args, **kwargs):
+        pagination = Pagination(
+            left_callback_data=self.left_callback_data,
+            right_callback_data=self.right_callback_data,
+            left_mark=self.left_mark,
+            right_mark=self.right_mark
+        )
+        back = Back(callback_data=self.back_callback_data)
+        self.text_message_markup.add_buttons_in_new_row(
+            pagination.left,
+            back.back,
+            pagination.right,
+        )
+        return self.text_message_markup
 
 
 class Input(InitializeMarkupInterface):
-    def __init__(self):
-        super().__init__()
-        self._temp = TextWidget(text=f"{Emoji.HOURGLASS_START} Processing...")
-        self._
+    def __init__(
+            self,
+            info: str,
+            back_callback_data: str,
+            state: States | None = None,
+    ):
+        super().__init__(state)
+        self.info = info
+        self.back_callback_data = back_callback_data
 
     async def init(self):
-        self.text_message_markup.add_text_row(self._temp)
-        return self.text_message_markup
+        temp = await SimpleText().init()
+        back = Back(callback_data=self.back_callback_data)
+        self.text_message_markup.add_text_row(temp)
 
 
 class Conform(InitializeMarkupInterface):
@@ -138,15 +173,14 @@ class Conform(InitializeMarkupInterface):
             no_callback_data: str | CallbackData
     ):
         super().__init__()
-        self._info = TextWidget(text=info)
-        self._yes = ButtonWidget(text=f"{Emoji.OK} Yes", callback_data=yes_callback_data)
-        self._no = ButtonWidget(text=f"{Emoji.DENIAL} No", callback_data=no_callback_data)
+        self.info = TextWidget(text=info)
+        self.yes = ButtonWidget(text=f"{Emoji.OK} Yes", callback_data=yes_callback_data)
+        self.no = ButtonWidget(text=f"{Emoji.DENIAL} No", callback_data=no_callback_data)
 
     async def init(self):
-        self.text_message_markup.add_texts_rows(self._info)
-        self.text_message_markup.add_buttons_in_new_row(self._yes, self._no)
+        self.text_message_markup.add_texts_rows(self.info)
+        self.text_message_markup.add_buttons_in_new_row(self.yes, self.no)
         return self.text_message_markup
-
 
 
 # class Profile(TextMarkup):
