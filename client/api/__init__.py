@@ -8,13 +8,9 @@ from cryptography.fernet import Fernet
 from client.utils.loggers import errors
 
 
-class ServerApi:
+class Api:
     _cipher = Fernet(os.getenv("CIPHER"))
     _address = os.getenv("BACKEND")
-
-    _logs = {
-        401: "Unauthorized"
-    }
 
     def __init__(self):
         self._headers = {
@@ -26,13 +22,13 @@ class ServerApi:
     @staticmethod
     def _async_request_middleware(request):
         @wraps(request)
-        async def wrapper(self, *args, **kwargs) -> Response:
+        async def wrapper(self, *args, **kwargs):
             data, code = await request(self, *args, **kwargs)
             if code == 401:
                 errors.error(f"401 Unauthorized. Worker: {request.__name__}")
             elif code == 500:
                 errors.error(f"500 Internal server error.")
-            return data
+            return data, code
         return wrapper
 
     @_async_request_middleware
@@ -54,7 +50,7 @@ class ServerApi:
                 return await response.json(), response.status
 
     @_async_request_middleware
-    async def authentication(self, password: str, user_id: str):
+    async def authentication(self, user_id: str, password: str | None = None):
         async with ClientSession(self._address) as session:
             async with session.post('/users/login', json={
                     'user_id': user_id,
@@ -64,8 +60,8 @@ class ServerApi:
 
     @_async_request_middleware
     async def get_targets(self, token: str):
+        self._headers["Authorization"] = f"Bearer {token}"
         async with ClientSession(self._address) as session:
-            self._headers["Authorization"] = f"Bearer {token}"
             async with session.get(
                     f'/targets',
                     headers=self._headers
@@ -96,6 +92,57 @@ class ServerApi:
         async with ClientSession(self._address) as session:
             async with session.get(
                     f'/users',
+                    headers=self._headers
+            ) as response:
+                return await response.json(), response.status
+
+    @_async_request_middleware
+    async def update_password(self, user_id: str, hash_: str):
+        async with ClientSession(self._address) as session:
+            async with session.put(
+                f"/users/password",
+                json={
+                    "user_id": user_id,
+                    "hash": hash_,
+                },
+                headers=self._headers
+            ) as response:
+                return await response.json(), response.status
+
+    async def delete_password(self, token: str):
+        self._headers["Authorization"] = f"Bearer {token}"
+        async with ClientSession(self._address) as session:
+            async with session.delete(
+                    f"/users/password",
+                    headers=self._headers
+            ) as response:
+                return await response.json(), response.status
+
+    async def update_email(self, token: str, email: str):
+        self._headers["Authorization"] = f"Bearer {token}"
+        async with ClientSession(self._address) as session:
+            async with session.put(
+                f"/users/email",
+                json={"email": email},
+                headers=self._headers
+            ) as response:
+                return await response.json(), response.status
+
+    async def delete_email(self, token: str):
+        self._headers["Authorization"] = f"Bearer {token}"
+        async with ClientSession(self._address) as session:
+            async with session.delete(
+                    f"/users/email",
+                    headers=self._headers
+            ) as response:
+                return await response.json(), response.status
+
+    async def update_notifications_time(self, token: str, hour: int, minute: int):
+        self._headers["Authorization"] = f"Bearer {token}"
+        async with ClientSession(self._address) as session:
+            async with session.put(
+                    "/users/notifications",
+                    json={"hour": hour, "minute": minute},
                     headers=self._headers
             ) as response:
                 return await response.json(), response.status

@@ -54,6 +54,9 @@ class Emoji:
     CRYING_CAT = "😿"
     LEFT = "⬅"
     RIGHT = "➡"
+    BUG = "🪲"
+    INCOMING_ENVELOPE = "📨"
+    UNLOCK = "🔓"
 
 
 class SerializableMixin:

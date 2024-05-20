@@ -2,6 +2,8 @@ from aiogram.fsm.state import StatesGroup, State
 
 
 class States(StatesGroup):
+    abyss_input = State()
+
     input_password = State()
     repeat_password = State()
     input_email = State()

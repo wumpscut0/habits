@@ -6,8 +6,10 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import BotCommand
 
-from client.api import ServerApi
+from client.api import Api
+from client.markups import Info, InitializeMarkupInterface
 from client.markups.core import TextMessageMarkup
+from client.markups.specific import TitleScreen
 from client.utils import Emoji
 from client.utils.loggers import errors
 from client.utils.redis import Storage
@@ -23,10 +25,6 @@ class BotCommands:
             command="/exit",
             description="Close interface"
         ),
-        BotCommand(
-            command="/jobs",
-            description="Show current tasks"
-        )
     ]
 
     @classmethod
@@ -37,14 +35,10 @@ class BotCommands:
     def exit(cls):
         return Command(cls.bot_commands[1].command.lstrip('/'))
 
-    @classmethod
-    def jobs(cls):
-        return Command(cls.bot_commands[2].command.lstrip('/'))
-
 
 class BotControl:
     bot = Bot(os.getenv('TOKEN'), parse_mode='HTML')
-    api = ServerApi()
+    api = Api()
 
     def __init__(self, user_id: int, state: FSMContext | None = None):
         self._user_id = user_id
@@ -57,7 +51,7 @@ class BotControl:
 
     async def create_text_message(self, text_message_markup: TextMessageMarkup, contextualize=True, context=True):
         if context:
-            self.storage.current_text_message_markup = text_message_markup
+            self.storage.context = text_message_markup
 
         if contextualize:
             await self._contextualize_chat()
@@ -75,9 +69,12 @@ class BotControl:
         except TelegramBadRequest:
             errors.critical("Unsuccessfully creating text message.")
 
-    async def update_text_message(self, text_message_markup: TextMessageMarkup, contextualize=True, context=True):
+    async def update_text_message(self, text_message_markup: TextMessageMarkup | InitializeMarkupInterface, contextualize=True, context=True):
+        if isinstance(text_message_markup, InitializeMarkupInterface):
+            text_message_markup = text_message_markup.text_message_markup
+
         if context:
-            self.storage.current_text_message_markup = text_message_markup
+            self.storage.context = text_message_markup
 
         if contextualize:
             await self._contextualize_chat()
@@ -87,7 +84,7 @@ class BotControl:
 
         last_message_id = self.storage.last_message_id
         if last_message_id is None:
-            await self.create_text_message(text_message_markup)
+            await self.create_text_message(text_message_markup, context)
             return
 
         try:
@@ -101,10 +98,22 @@ class BotControl:
         except TelegramBadRequest:
             await self.delete_message(last_message_id)
             self.storage.pop_last_message_id_from_the_pull()
-            await self.update_text_message(text_message_markup)
+            await self.update_text_message(text_message_markup, context)
 
-    async def refresh_context(self):
-        await self.update_text_message(self.storage.current_text_message_markup)
+    async def return_to_context(self):
+        try:
+            await self.update_text_message(self.storage.context)
+        except Exception:
+            # If we change code with context in redis, then exist chance work this exception
+            self.storage.context = await TitleScreen().init(self.user_id)
+            await self.update_text_message(Info("Application updated. Please sign in again.").text_message_markup, context=False)
+
+    async def send_message_to_admin(self, message: str):
+        await self.bot.send_message(
+            chat_id=os.getenv("GROUP_ID"),
+            text=f"Reply from {self.storage.first_name}\n"
+                 f"{message}",
+        )
 
     async def _contextualize_chat(self):
         valuables_messages = []

@@ -3,9 +3,10 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.redis import RedisJobStore
 from apscheduler.triggers.cron import CronTrigger
 
-from client.api import ServerApi
+from client.api import Api
 from client.bot import BotControl
-from client.markups.basic import Info
+from client.markups import Info
+
 from client.utils.loggers import info, errors
 from client.utils.redis import HourGlassAnimationIdsPull
 
@@ -22,7 +23,7 @@ class Scheduler:
     scheduler.configure(jobstores=_jobstores, job_defaults=_job_defaults)
 
     _increase_progress_id = "increase_progress"
-    _api = ServerApi()
+    _api = Api()
     _hour_glass_animation_ids_pull = HourGlassAnimationIdsPull()
 
     @classmethod
@@ -65,12 +66,12 @@ class Scheduler:
 class Workers:
     @staticmethod
     async def remainder(user_id: int):
-        await BotControl(user_id).create_text_message(await Info('Don`t forget mark done target today').init(), context=False)
+        await BotControl(user_id).create_text_message(Info('Don`t forget mark done target today').text_message_markup, context=False)
         info.info(f'Remaining sent to user {user_id}')
 
     @staticmethod
     async def increase_progress():
-        api = ServerApi()
+        api = Api()
         response = await api.increase_progress()
         if response.status == 200:
             info.info(f'Progress increased')

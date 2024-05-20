@@ -1,4 +1,3 @@
-from abc import abstractmethod, ABC
 from typing import List
 
 from aiogram.filters.callback_data import CallbackData
@@ -8,29 +7,7 @@ from aiogram.types import InputMediaPhoto
 from aiogram.utils.formatting import as_list, Text, Bold, Italic
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from client.api import ServerApi
 from client.utils import Emoji
-
-
-class InitializeMarkupInterface(ABC):
-    api = ServerApi()
-
-    @abstractmethod
-    def __init__(self, state: State | None = None):
-        self.text_message_markup = TextMessageMarkup(state)
-        """
-        super().__init__()
-        `self.<widget_name> = TextWidget("hello"),`
-        """
-        ...
-
-    @abstractmethod
-    async def init(self, *args, **kwargs):
-        """
-        self.text_message.add_text_row(self.<widget_name>)\n
-        return self.text_message
-        """
-        ...
 
 
 class TextWidget:
@@ -77,23 +54,30 @@ class DataTextWidget(TextWidget):
         self.sep = sep
         self.end = end
 
+    @property
     def text(self):
         return super().text + Text(self.sep) + Italic(self.data) + Italic(self.end)
 
 
-class ButtonWidget(TextWidget):
+class ButtonWidget:
     def __init__(
             self, *,
             mark: str = '',
             text: str = None,
             callback_data: str | CallbackData = None
     ):
-        super().__init__(
-            mark=mark,
-            text=text,
-        )
+        self.mark = mark
+        self._text = text
         self._callback_data = callback_data
 
+    @property
+    def text(self):
+        separator = '' if str(self._text).startswith(' ') else ' '
+        return self.mark + separator + self._text
+
+    @text.setter
+    def text(self, text: str):
+        self._text = text
 
     @property
     def callback_data(self):
@@ -115,7 +99,8 @@ class TextMarkup:
     def text_map(self):
         return self._text_map
 
-    def set_text_map(self, map_: List[DataTextWidget | TextWidget]):
+    @text_map.setter
+    def text_map(self, map_: List[DataTextWidget | TextWidget]):
         self._text_map = map_
 
     def add_text_row(self, text: DataTextWidget | TextWidget):
@@ -147,7 +132,8 @@ class KeyboardMarkup:
     def keyboard_map(self):
         return self._keyboard_map
 
-    def set_markup_map(self, map_: List[List[ButtonWidget]]):
+    @keyboard_map.setter
+    def keyboard_map(self, map_: List[List[ButtonWidget]]):
         self._keyboard_map = map_
 
     def add_button_in_last_row(self, button: ButtonWidget):
@@ -193,13 +179,13 @@ class TextMessageMarkup(TextMarkup, KeyboardMarkup):
         super().__init__()
         self.state = state
 
-    def __add__(self, text_message_markup):
-        if not isinstance(text_message_markup, TextMessageMarkup):
-            raise ValueError("TextMessageMarkup can only concatenate with TextMessageMarkup")
-        for text_row in text_message_markup.text_map:
-            self.add_text_row(text_row)
-        for buttons_row in text_message_markup.keyboard_map:
+    def __add__(self, o):
+        if not isinstance(o, self.__class__):
+            return ValueError(f"Concatenate {self.__class__.__name__} can possible only with {self.__class__.__name__}")
+        self.add_texts_rows(*o.text_map)
+        for buttons_row in o.keyboard_map:
             self.add_buttons_in_new_row(*buttons_row)
+        return self
 
 
 class PhotoMessageMarkup(TextMessageMarkup):

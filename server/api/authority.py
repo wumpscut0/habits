@@ -54,7 +54,7 @@ class Authority:
     async def user_authenticate(cls, auth_api_model: AuthApiModel):
         async with Session.begin() as session:
             user = await UserQueries.get_user(session, auth_api_model.user_id)
-            if user is None or (user.get("hash") is not None and not cls._verify_password(auth_api_model.password, user.get("hash"))):
+            if user is None or (user.get("hash") is not None and not await cls._verify_password(auth_api_model.password, user.get("hash"))):
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Incorrect user id or api key",
@@ -62,16 +62,15 @@ class Authority:
                 )
         expire = datetime.now() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         return Token(
-            access_token=cls._encode_jwt({"sub": user.username, "exp": expire}),
+            access_token=cls._encode_jwt({"sub": auth_api_model.user_id, "exp": expire}),
             token_type="bearer"
         )
 
     @classmethod
     async def user_authorization(cls, token: Annotated[str, Depends(oauth2_schema)]):
         payload = await cls._decode_jwt(token)
-        user_id = payload.get("sub")
         async with Session.begin() as session:
-            if user_id is None or UserQueries.get_user(session, user_id) is None:
+            if UserQueries.get_user(session, payload.get("sub")) is None:
                 raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect sub field")
         return payload
 

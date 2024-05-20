@@ -6,9 +6,12 @@ from redis import Redis
 from redis.commands.core import ResponseT
 from redis.typing import KeyT, ExpiryT, AbsExpiryT
 
+from client.markups import InitializeMarkupInterface
 from client.utils import config
 
 VERIFY_CODE_EXPIRATION = config.getint("limitations", "VERIFY_CODE_EXPIRATION")
+PASSWORD_EXPIRATION = config.getint("limitations", "PASSWORD_EXPIRATION")
+EMAIL_EXPIRATION = config.getint("limitations", "EMAIL_EXPIRATION")
 
 
 class CustomRedis(Redis):
@@ -82,12 +85,14 @@ class Storage:
         self.user_id = user_id
 
     @property
-    def current_text_message_markup(self):
-        return self.storage.get(f"current_text_message_markup:{self.user_id}")
+    def context(self):
+        return self.storage.get(f"context_text_message_markup:{self.user_id}")
 
-    @current_text_message_markup.setter
-    def current_text_message_markup(self, data: Any):
-        self.storage.set(f"current_text_message_markup:{self.user_id}", data)
+    @context.setter
+    def context(self, data: Any):
+        if isinstance(data, InitializeMarkupInterface):
+            data = data.text_message_markup
+        self.storage.set(f"context_text_message_markup:{self.user_id}", data)
 
     @property
     def first_name(self):
@@ -167,3 +172,27 @@ class Storage:
     @verify_code.setter
     def verify_code(self, data: Any):
         self.storage.setex(f"verify_code:{self.user_id}", VERIFY_CODE_EXPIRATION, data)
+
+    @property
+    def email(self):
+        return self.storage.getex(f"email:{self.user_id}")
+
+    @email.setter
+    def email(self, data: Any):
+        self.storage.setex(f"email:{self.user_id}", EMAIL_EXPIRATION, data)
+
+    @property
+    def password(self):
+        return self.storage.getex(f"password:{self.user_id}")
+
+    @password.setter
+    def password(self, data: Any):
+        self.storage.setex(f"password:{self.user_id}", PASSWORD_EXPIRATION, data)
+
+    @property
+    def hash(self):
+        return self.storage.get(f"hash:{self.user_id}")
+
+    @hash.setter
+    def hash(self, data: Any):
+        self.storage.set(f"hash:{self.user_id}", data)

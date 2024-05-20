@@ -3,9 +3,9 @@ from aiogram.filters import StateFilter, Command
 from aiogram.types import Message, BotCommand
 
 from client.bot import BotControl, BotCommands
-from client.markups.basic import TitleScreen, SimpleText
+
 from client.markups.core import TextMessageMarkup, TextWidget
-from client.utils.scheduler import Jobs
+from client.markups.specific import TitleScreen
 
 commands_router = Router()
 
@@ -19,13 +19,7 @@ async def start(message: Message, bot_control: BotControl):
 
 @commands_router.message(BotCommands.exit())
 async def exit_(message: Message, bot_control: BotControl):
-    text_message = TextMessageMarkup()
-    text_message.add_text_row(TextWidget(text='Good by!'))
-    await bot_control.update_text_message(text_message)
-    await message.delete()
-
-
-@commands_router.message(BotCommands.jobs())
-async def jobs(message: Message, bot_control: BotControl):
-    await bot_control.update_text_message(await Jobs().init())
+    markup = TextMessageMarkup()
+    markup.add_text_row(TextWidget(text="Good by!"))
+    await bot_control.update_text_message(markup)
     await message.delete()
