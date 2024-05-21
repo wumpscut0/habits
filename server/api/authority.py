@@ -70,7 +70,7 @@ class Authority:
     async def user_authorization(cls, token: Annotated[str, Depends(oauth2_schema)]):
         payload = await cls._decode_jwt(token)
         async with Session.begin() as session:
-            if UserQueries.get_user(session, payload.get("sub")) is None:
+            if await UserQueries.get_user(session, payload.get("sub")) is None:
                 raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect sub field")
         return payload
 

@@ -1,13 +1,37 @@
-from typing import List
-
-from aiogram.filters.callback_data import CallbackData
-from aiogram.fsm.state import State
+from typing import List, Self, Union
 
 from aiogram.types import InputMediaPhoto
 from aiogram.utils.formatting import as_list, Text, Bold, Italic
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from abc import abstractmethod, ABC
+
+from aiogram.filters.callback_data import CallbackData
+from aiogram.fsm.state import State
+
+from client.api import Api
 from client.utils import Emoji
+
+
+class InitializeMarkupInterface(ABC):
+
+    def __init__(self, state: State | None = None):
+        self.text_message_markup = TextMessageMarkup(state)
+
+
+class InitializeApiMarkupInterface(InitializeMarkupInterface):
+    def __init__(self, state: State | None = None):
+        super().__init__(state)
+        self._api = Api()
+
+    @abstractmethod
+    async def init(self):
+        """
+        data, code = await self._api.<method>
+        self.text_message_markup.add_text_row(<widget>)\n
+        return self | self.text_message_markup |
+        """
+        ...
 
 
 class TextWidget:
@@ -179,16 +203,15 @@ class TextMessageMarkup(TextMarkup, KeyboardMarkup):
         super().__init__()
         self.state = state
 
-    def __add__(self, o):
-        if not isinstance(o, self.__class__):
-            return ValueError(f"Concatenate {self.__class__.__name__} can possible only with {self.__class__.__name__}")
-        self.add_texts_rows(*o.text_map)
-        for buttons_row in o.keyboard_map:
+    def attach(self, text_message_markup: InitializeMarkupInterface | Self):
+        if isinstance(text_message_markup, InitializeMarkupInterface):
+            text_message_markup = text_message_markup.text_message_markup
+        self.add_texts_rows(*text_message_markup.text_map)
+        for buttons_row in text_message_markup.keyboard_map:
             self.add_buttons_in_new_row(*buttons_row)
-        return self
 
 
 class PhotoMessageMarkup(TextMessageMarkup):
-    def __init__(self, photo: str | InputMediaPhoto):
-        super().__init__()
+    def __init__(self, photo: str | InputMediaPhoto, state: State | None = None):
+        super().__init__(state)
         self.photo = photo

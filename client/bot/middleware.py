@@ -2,20 +2,32 @@ from typing import Any, Dict, Callable, Awaitable
 
 from aiogram import BaseMiddleware
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Update, TelegramObject
+from aiogram.types import Update
 
 from client.bot import BotControl
+from client.markups import Info
+from client.utils import Emoji
+from client.utils.loggers import errors
 
 
 class BuildBotControl(BaseMiddleware):
     async def __call__(
         self,
-        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
+        handler: Callable[[Update, Dict[str, Any]], Awaitable[Any]],
         event: Update,
         data: Dict[str, Any]
     ) -> Any:
-        data["bot_control"] = await self._build_bot_control(event, data["state"])
-        return await handler(event, data)
+        bot_control = await self._build_bot_control(event, data["state"])
+        data["bot_control"] = bot_control
+        try:
+            return await handler(event, data)
+        except BaseException as e:
+            errors.critical(f"An error occurred when execution some handler:\n{e}")
+            await bot_control.update_text_message(
+                Info(f"Something went wrong {Emoji.CRYING_CAT}\n"
+                     f"You can write feedback by sending any message to the chat room."),
+                )
+            raise e
 
     @classmethod
     async def _build_bot_control(cls, event, state: FSMContext):

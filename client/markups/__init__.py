@@ -1,35 +1,8 @@
-from abc import abstractmethod, ABC
-
 from aiogram.filters.callback_data import CallbackData
-from aiogram.fsm.state import State
 
-from client.api import Api
 from client.bot.FSM import States
-from client.markups.core import TextMessageMarkup, ButtonWidget, TextWidget
+from client.markups.core import TextMessageMarkup, ButtonWidget, TextWidget, InitializeMarkupInterface
 from client.utils import Emoji
-
-
-class InitializeMarkupInterface(ABC):
-    @abstractmethod
-    def __init__(self, state: State | None = None):
-        self.text_message_markup = TextMessageMarkup(state)
-        """
-        super().__init__()
-        `self.<widget_name> = <widget_class>(text="hello"),`
-        """
-        ...
-
-
-class InitializeApiMarkupInterface(InitializeMarkupInterface):
-    _api = Api()
-
-    @abstractmethod
-    async def init(self, *args, **kwargs):
-        """
-        self.text_message.add_text_row(self.<widget_name>)\n
-        return self.text_message
-        """
-        ...
 
 
 class Info(InitializeMarkupInterface):
@@ -86,10 +59,9 @@ class LeftBackRight(InitializeMarkupInterface):
             left_mark=left_mark,
             right_mark=right_mark
         )
-        back = Back(callback_data=back_callback_data)
         self.text_message_markup.add_buttons_in_new_row(
             pagination.left,
-            back.back,
+            Back(callback_data=back_callback_data).back,
             pagination.right,
         )
 
@@ -108,7 +80,7 @@ class Input(InitializeMarkupInterface):
         super().__init__(state)
         self.info = TextWidget(mark=info_mark, text=info_text)
         self.text_message_markup.add_text_row(self.info)
-        self.text_message_markup += Back(mark=back_mark, text=back_text, callback_data=back_callback_data).text_message_markup
+        self.text_message_markup.attach(Back(mark=back_mark, text=back_text, callback_data=back_callback_data))
 
 
 class Conform(InitializeMarkupInterface):

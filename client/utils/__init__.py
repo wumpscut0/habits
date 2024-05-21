@@ -57,6 +57,8 @@ class Emoji:
     BUG = "🪲"
     INCOMING_ENVELOPE = "📨"
     UNLOCK = "🔓"
+    PENCIL = "✏️"
+    BROKEN_HEARTH = "💔"
 
 
 class SerializableMixin:

@@ -44,7 +44,7 @@ class Api:
     async def get_user(self, user_id: str):
         async with ClientSession(self._address) as session:
             async with session.get(
-                    f'/users/{self._cipher.encrypt(user_id.encode()).decode()}',
+                    f'/users/{self._cipher.encrypt(str(user_id).encode()).decode()}',
                     headers=self._headers
             ) as response:
                 return await response.json(), response.status

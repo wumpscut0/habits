@@ -6,71 +6,65 @@ from zxcvbn import zxcvbn
 
 from client.api import Api
 from client.bot.FSM import States
-from client.markups import InitializeMarkupInterface, InitializeApiMarkupInterface, Back, Conform, Info
-from client.markups.core import TextMarkup, TextWidget, KeyboardMarkup, ButtonWidget, DataTextWidget, TextMessageMarkup
+from client.markups import InitializeMarkupInterface, Back, Conform, Info
+from client.markups.core import TextMarkup, TextWidget, KeyboardMarkup, ButtonWidget, DataTextWidget, TextMessageMarkup, \
+    InitializeApiMarkupInterface
 from client.utils import Emoji, config
 from client.utils.mailing import Mailing
 
-MAX_EMAIL_LENGTH = config.getint('limitations', 'MAX_EMAIL_LENGTH')
-MAX_NAME_LENGTH = config.getint('limitations', 'MAX_NAME_LENGTH')
-MAX_DESCRIPTION_LENGTH = config.getint('limitations', 'MAX_DESCRIPTION_LENGTH')
-MAX_PASSWORD_LENGTH = config.getint('limitations', "MAX_PASSWORD_LENGTH")
-MIN_BORDER_RANGE = config.getint('limitations', "MIN_BORDER_RANGE")
-MAX_BORDER_RANGE = config.getint('limitations', "MAX_BORDER_RANGE")
-STANDARD_BORDER_RANGE = config.getint('limitations', "STANDARD_BORDER_RANGE")
-VERIFY_CODE_EXPIRATION = config.getint("limitations", "VERIFY_CODE_EXPIRATION")
-
 
 class TitleScreen(InitializeApiMarkupInterface):
-    def __init__(self):
+    def __init__(self, user_id: str):
+        self._user_id = user_id
         super().__init__()
-        self._info = TextWidget(text=f"{Emoji.BRAIN} Psychological service")
-        self._sign_in = ButtonWidget(text=f'{Emoji.DOOR} Sign in', callback_data='authorization')
-        self._notifications = ButtonWidget(
-            text="Notifications",
-            callback_data="invert_notifications",
-        )
 
-    async def init(self, user_id: str):
-        self.text_message_markup.add_text_row(self._info)
-        self.text_message_markup.add_button_in_new_row(self._sign_in)
-        await self._init_notification(user_id)
-        self.text_message_markup.add_button_in_new_row(self._notifications)
+    async def init(self):
+        info = TextWidget(text=f"{Emoji.BRAIN} Psychological service")
+        sign_in = ButtonWidget(text=f'{Emoji.DOOR} Sign in', callback_data='authorization')
+        self.text_message_markup.add_text_row(info)
+        self.text_message_markup.add_button_in_new_row(sign_in)
+        self.text_message_markup.add_button_in_new_row(await self._init_notification(self._user_id))
         return self.text_message_markup
 
     async def _init_notification(self, user_id: str):
-        user, code = await self._api.get_user(user_id)
+        notifications_button = ButtonWidget(
+            text="Notifications",
+            callback_data="invert_notifications",
+        )
+        data, code = await self._api.get_user(user_id)
         if code == 200:
-            notifications = user.get("notifications")
-            assert notifications is not None
-            if notifications:
-                self._notifications.mark = Emoji.BELL
+            if data["notifications"]:
+                notifications_button.mark = Emoji.BELL
             else:
-                self._notifications.mark = Emoji.NOT_BELL
+                notifications_button.mark = Emoji.NOT_BELL
         else:
-            self._notifications.text = Emoji.DENIAL + " Error"
-            self._notifications.mark = Emoji.RED_QUESTION
+            notifications_button.text = Emoji.DENIAL + " Error"
+            notifications_button.mark = Emoji.RED_QUESTION
+        return notifications_button
 
 
 class AuthenticationWithPassword(InitializeApiMarkupInterface):
-    def __init__(self):
-        super().__init__(States.sign_in_with_password)
-        self.info = TextWidget(text=f'{Emoji.KEY} Enter the password')
+    def __init__(self, user_id: str):
+        self._user_id = user_id
+        super().__init__(States.input_text_sign_in_with_password)
 
-    async def init(self, user_id):
-        self.text_message_markup.add_text_row(self.info)
-        await self._init_button_2(user_id)
-        self.text_message_markup += Back(callback_data="return_to_context").text_message_markup
+    async def init(self):
+        info = TextWidget(text=f'{Emoji.KEY} Enter the password')
+        self.text_message_markup.add_text_row(info)
+        button = await self._init_reset_password(self._user_id)
+        if button is not None:
+            self.text_message_markup.add_button_in_new_row(button)
+        self.text_message_markup.attach(Back())
         return self
 
-    async def _init_button_2(self, user_id: str):
+    async def _init_reset_password(self, user_id: str):
+        reset_password = ButtonWidget(
+            text=f'{Emoji.CYCLE} Reset password',
+            callback_data='reset_password'
+        )
         data, code = await self._api.get_user(user_id)
-        if code == 200:
-            if data["email"]:
-                self.text_message_markup.add_button_in_new_row(ButtonWidget(
-                    text=f'{Emoji.CYCLE} Reset password',
-                    callback_data='reset_password'
-                ))
+        if code == 200 and data["email"]:
+            return reset_password
 
 
 class PasswordResume(InitializeMarkupInterface):
@@ -128,25 +122,24 @@ class Profile(InitializeMarkupInterface):
 
 
 class Options(InitializeApiMarkupInterface):
-    def __init__(self):
+    def __init__(self, user_id: str):
         super().__init__()
+        self._user_id = user_id
         self.time = DataTextWidget(text=f"{Emoji.BELL + Emoji.CLOCK} Notification time")
         self.delete_password = ButtonWidget(text=f"{Emoji.KEY + Emoji.DENIAL} Delete password", callback_data="delete_password")
         self.input_password = ButtonWidget(callback_data="input_password")
         self.delete_email = ButtonWidget(text=f"{Emoji.ENVELOPE + Emoji.DENIAL} Delete email", callback_data="delete_email")
-        self.input_email = ButtonWidget(callback_data="input_password")
+        self.input_email = ButtonWidget(callback_data="input_email")
         self.change_notifications = ButtonWidget(
             text=f"{Emoji.BELL + Emoji.CLOCK} Change notification time",
             callback_data="change_notification_time"
         )
 
-    async def init(self, user_id: str):
-        data, code = await self._api.get_user(user_id)
+    async def init(self):
+        data, code = await self._api.get_user(self._user_id)
         if code == 200:
             time_ = data["notification_time"]
-            minute = str(time_['minute'])
-            minute = "0" + minute if len(minute) < 2 else minute
-            self.time.data = f"{time_['hour']}:{minute}"
+            self.time.data = f"{time_['hour']}:{str(time_['minute']).zfill(2)}"
             self.text_message_markup.add_text_row(self.time)
             if data["hash"]:
                 self.input_password.text = f'{Emoji.KEY + Emoji.UP} Change password'
@@ -165,94 +158,10 @@ class Options(InitializeApiMarkupInterface):
             self.text_message_markup.add_text_row(TextWidget(text=f"{Emoji.DENIAL} Internal server error"))
 
         self.text_message_markup.add_button_in_new_row(self.change_notifications)
-        self.text_message_markup += Back(callback_data="profile").text_message_markup
+        self.text_message_markup.attach(Back(callback_data="profile"))
         return self
 
 
-
-
-
-
-
-#
-#
-#
-#
-#
-#
-# class RepeatPassword(TextMarkup):
-#     def __init__(self, interface):
-#         super().__init__(
-#             interface,
-#             text_map=TextMap(
-#                 {
-#                     "action": TextWidget(f'{Emoji.KEY}{Emoji.KEY} Repeat the password'),
-#                 }
-#             ),
-#             markup_map=MarkupMap(
-#                 [
-#                     {
-#                         "back": ButtonWidget(text=f"{Emoji.DENIAL} Cancel", callback_data='options')
-#                     }
-#                 ]
-#             ),
-#             state=States.repeat_password
-#         )
-#
-#     async def __call__(self, password: str):
-#         if password != storage.get(f"password:{self._interface._user_id}"):
-#             await self._interface.update_feedback("Passwords not matched")
-#             await self._interface.basic_manager.input_password.open()
-#         else:
-#             storage.set(f"password_grade:{self._interface._user_id}", zxcvbn(password))
-#             storage.set(f"hash:{self._interface._user_id}", pbkdf2_sha256.hash(password))
-#             await self._interface.basic_manager.resume_password.open()
-#
-#
-
-#
-#
-# class InputEmail(TextMarkup):
-#     def __init__(self, interface):
-#         super().__init__(
-#             interface,
-#             text_map=TextMap(
-#                 {
-#                     "action": TextWidget(f'{Emoji.ENVELOPE} Enter the email'),
-#                 }
-#             ),
-#             markup_map=MarkupMap(
-#                 [
-#                     {
-#                         "back": ButtonWidget(text=f'{Emoji.DENIAL} Cancel', callback_data="options")
-#                     }
-#                 ]
-#             ),
-#             state=States.input_email
-#         )
-#
-#     async def __call__(self, email: str):
-#         if len(email) > MAX_EMAIL_LENGTH:
-#             await self._interface.update_feedback(f'Max email length is {MAX_EMAIL_LENGTH} symbols.')
-#             await self.open()
-#         elif not re.fullmatch(r'[a-zA-Z0-9]+@[a-zA-Z]+\.[a-zA-Z]', email, flags=re.I):
-#             await self._interface.update_feedback('Allowable format is example@email.com', type_="error")
-#             await self.open()
-#         else:
-#             await self._interface.temp_message("Sending...")
-#             verify_code = await Mailing.verify_email(email)
-#             if verify_code is not None:
-#                 await self._interface.update_feedback(f"verify code sent on email:"
-#                                                       f" {email}.",
-#                                                       type_='info')
-#                 storage.setex(f"verify_email_code:{self._interface._user_id}", VERIFY_CODE_EXPIRATION, verify_code)
-#                 storage.set(f"email:{self._interface._user_id}", email)
-#                 await self._interface.basic_manager.input_verify_email_code.open()
-#             else:
-#                 await self._interface.update_feedback(f"Email {email} not found", type_="error")
-#                 await self.open()
-#
-#
 # class InputVerifyEmailCode(TextMarkup):
 #     def __init__(self, interface):
 #         super().__init__(

@@ -86,13 +86,11 @@ class Storage:
 
     @property
     def context(self):
-        return self.storage.get(f"context_text_message_markup:{self.user_id}")
+        return self.storage.get(f"context:{self.user_id}")
 
     @context.setter
     def context(self, data: Any):
-        if isinstance(data, InitializeMarkupInterface):
-            data = data.text_message_markup
-        self.storage.set(f"context_text_message_markup:{self.user_id}", data)
+        self.storage.set(f"context:{self.user_id}", data)
 
     @property
     def first_name(self):

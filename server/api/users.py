@@ -44,19 +44,19 @@ async def update_password(update_password_api_model: UpdatePasswordApiModel):
 @users_router.delete("/password")
 async def delete_password(payload: Annotated[Payload, Depends(Authority.user_authorization)]):
     async with Session.begin() as session:
-        await PasswordQueries.delete_password(session, payload.sub)
+        await PasswordQueries.delete_password(session, payload["sub"])
 
 
 @users_router.put('/email')
 async def update_email(email_api_model: EmailApiModel, payload: Annotated[Payload, Depends(Authority.user_authorization)]):
     async with Session.begin() as session:
-        await EmailQueries.update(session, payload.sub, email_api_model.email)
+        await EmailQueries.update(session, payload["sub"], email_api_model.email)
 
 
 @users_router.delete("/email")
 async def delete_email(payload: Annotated[Payload, Depends(Authority.user_authorization)]):
     async with Session.begin() as session:
-        await EmailQueries.delete(session, payload.sub)
+        await EmailQueries.delete(session, payload["sub"])
 
 
 @users_router.patch("/notifications")
@@ -68,4 +68,4 @@ async def invert_notifications(user_id_api_model: UserIdApiModel):
 @users_router.put("/notification")
 async def change_notification_time(time_: NotificationTimeApiModel, payload: Annotated[Payload, Depends(Authority.user_authorization)]):
     async with Session.begin() as session:
-        await NotificationsQueries.update(session, payload.sub, time(**time_.model_dump()))
+        await NotificationsQueries.update(session, payload["sub"], time(**time_.model_dump()))
