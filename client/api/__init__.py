@@ -1,11 +1,7 @@
 import os
-from functools import wraps
 
 from aiohttp import ClientSession
-from aiohttp.web_response import Response
 from cryptography.fernet import Fernet
-
-from client.utils.loggers import errors
 
 
 class Api:
@@ -19,19 +15,6 @@ class Api:
             "api-key": os.getenv("API_KEY")
         }
 
-    @staticmethod
-    def _async_request_middleware(request):
-        @wraps(request)
-        async def wrapper(self, *args, **kwargs):
-            data, code = await request(self, *args, **kwargs)
-            if code == 401:
-                errors.error(f"401 Unauthorized. Worker: {request.__name__}")
-            elif code == 500:
-                errors.error(f"500 Internal server error.")
-            return data, code
-        return wrapper
-
-    @_async_request_middleware
     async def add_user(self, user_id: str):
         async with ClientSession(self._address) as session:
             async with session.post(
@@ -40,7 +23,6 @@ class Api:
             ) as response:
                 return await response.json(), response.status
 
-    @_async_request_middleware
     async def get_user(self, user_id: str):
         async with ClientSession(self._address) as session:
             async with session.get(
@@ -49,7 +31,6 @@ class Api:
             ) as response:
                 return await response.json(), response.status
 
-    @_async_request_middleware
     async def authentication(self, user_id: str, password: str | None = None):
         async with ClientSession(self._address) as session:
             async with session.post('/users/login', json={
@@ -58,7 +39,6 @@ class Api:
             }, headers=self._headers) as response:
                 return await response.json(), response.status
 
-    @_async_request_middleware
     async def get_targets(self, token: str):
         self._headers["Authorization"] = f"Bearer {token}"
         async with ClientSession(self._address) as session:
@@ -68,7 +48,6 @@ class Api:
             ) as response:
                 return await response.json(), response.status
 
-    @_async_request_middleware
     async def invert_notifications(self, user_id: str):
         async with ClientSession(self._address) as session:
             async with session.patch(
@@ -78,7 +57,6 @@ class Api:
             ) as response:
                 return await response.json(), response.status
 
-    @_async_request_middleware
     async def increase_progress(self):
         async with ClientSession(self._address) as session:
             async with session.patch(
@@ -87,7 +65,6 @@ class Api:
             ) as response:
                 return await response.json(), response.status
 
-    @_async_request_middleware
     async def get_users(self):
         async with ClientSession(self._address) as session:
             async with session.get(
@@ -96,7 +73,6 @@ class Api:
             ) as response:
                 return await response.json(), response.status
 
-    @_async_request_middleware
     async def update_password(self, user_id: str, hash_: str):
         async with ClientSession(self._address) as session:
             async with session.put(
@@ -146,3 +122,38 @@ class Api:
                     headers=self._headers
             ) as response:
                 return await response.json(), response.status
+
+    async with self._interface.session.post('/targets', json={
+    #             "name": name,
+    #             "border_progress": border
+    #         }, headers={"Authorization": self._interface.token}) as response:
+
+    async with self._interface.session.delete(
+    #             f'/targets/{storage.get(f"target_id:{self._interface._user_id}")}',
+    #             headers={"Authorization": self._interface.token}
+    #         ) as response:
+
+    #         async with (self._interface.session.get(f"/targets/{kwargs['target_id']}", headers={"Authorization": self._interface.token}) as response):
+
+    #         async with self._interface.session.patch(f'/targets/{target_id}/invert', headers={"Authorization": self._interface.token}) as response:
+
+    async with self._interface.session.patch(
+    #                 f'/target/{target_id}', json={"name": name},
+    #                 headers={"Authorization": self._interface.token}
+    #             ) as response:
+    #                 response = await self._interface.response_middleware(response)
+    #                 if response is not None:
+    #                     await self._interface.targets_manager.target.open(target_id=target_id)
+
+    async with self._interface.session.patch(
+    #                     f'/target/{target_id}', json={"name": description},
+    #                     headers={"Authorization": self._interface.token}
+    #             ) as response:
+    #                 response = await self._interface.response_middleware(response)
+    #                 if response is not None:
+    #                     await self._interface.targets_manager.target.open(target_id=target_id)
+
+    async with self._interface.session.get(
+    #                 f"/target/{kwargs['target_id']}",
+    #                 headers={"Authorization": self._interface._user_id}
+    #         ) as response:

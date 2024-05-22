@@ -8,110 +8,46 @@ from client.bot.FSM import States
 
 
 targets_router = Router()
+if len(name) > MAX_NAME_LENGTH:
+#             await self._interface.update_feedback(f"Maximum name length is {MAX_NAME_LENGTH} simbols", type_="error")
+#             await self.open()
+#         elif not re.fullmatch(r'[\w\s]+', name, flags=re.I):
+#             await self._interface.update_feedback(f"Name must contains only latin symbols or _ or spaces or digits", type_="error")
+#             await self.open()
+#         else:
+#             storage.set(f"target_name:{self._interface._user_id}", name)
+#             await self._interface.targets_manager.input_target_border.open()
 
 
-# @targets_router.callback_query(F.data == 'targets_control')
-# async def open_targets_control(callback: CallbackQuery, interface: Interface):
-#     await interface.targets_manager.targets_control.open()
+try:
+# border = int(border)
+#         except ValueError:
+#             await self._interface.update_feedback(f"Border value must be integer")
+#         if not MIN_BORDER_RANGE <= border <= MAX_BORDER_RANGE:
+#             await self._interface.update_feedback(f'Border range must be at {MIN_BORDER_RANGE} to {MAX_BORDER_RANGE}', type_="error")
+#             await self.open()
+#         else:
+#             storage.set(f"target_border:{self._interface._user_id}", int(border))
+#             await self._interface.targets_manager.targets_control.create_target()
+
+target_id = storage.get(f"target_id:{self._interface._user_id}")
+#         if len(name) > MAX_NAME_LENGTH:
+#             await self._interface.update_feedback(f"Maximum name length is {MAX_NAME_LENGTH} simbols")
+#             await self.open()
+#         elif not re.fullmatch(r'[\w\s]+', name, flags=re.I):
+#             await self._interface.update_feedback(f"Name must contains only latin symbols or _ or spaces or digits")
+#             await self.open()
+#         else:
 #
+
+ if len(description) > MAX_DESCRIPTION_LENGTH:
+#             await self._interface.update_feedback(f"Maximum description length is {MAX_DESCRIPTION_LENGTH} simbols")
+#             await self.open()
+#         elif not re.fullmatch(r'[\w\s,?!:.]+', description, flags=re.I):
+#             await self._interface.update_feedback(
+#                 f"Description must contains only latin symbols or _ or , or ? or ! or : or . or spaces or digits",
+#                 type_="error"
+#             )
+#             await self.open()
+#         else:
 #
-# ########################################################################################################################
-#
-#
-# @targets_router.callback_query(F.data == "input_target_name")
-# async def open_input_target_name(callback: CallbackQuery, interface: Interface):
-#     await interface.targets_manager.input_target_name.open()
-#
-#
-# @targets_router.message(StateFilter(States.input_target_name), F.text)
-# async def input_target_name(message: Message, interface: Interface):
-#     await interface.targets_manager.input_target_name(message.text)
-#     await message.delete()
-#
-#
-# @targets_router.message(StateFilter(States.input_target_border), F.text)
-# async def input_target_border(message: Message, interface: Interface):
-#     await interface.targets_manager.input_target_border(message.text)
-#     await message.delete()
-#
-#
-# @targets_router.callback_query(F.data == "create_target")
-# async def create_target(callback: CallbackQuery, interface: Interface):
-#     await interface.targets_manager.targets_control.create_target()
-#
-#
-# ########################################################################################################################
-#
-#
-# @targets_router.callback_query(F.data == "completed_targets")
-# async def open_completed_targets(callback: CallbackQuery, interface: Interface):
-#     await interface.targets_manager.completed_targets.open()
-#
-#
-# @targets_router.callback_query(ShowCompletedTargetCallbackData.filter())
-# async def completed_target(callback: CallbackQuery, callback_data: ShowCompletedTargetCallbackData, interface: Interface):
-#     await interface.targets_manager.completed_target.open(target_id=callback_data.id)
-#
-#
-# ########################################################################################################################
-#
-#
-# @targets_router.callback_query(F.data == "targets")
-# async def open_targets(callback: CallbackQuery, interface: Interface):
-#     await interface.targets_manager.targets.open()
-#
-#
-# @targets_router.callback_query(ShowTargetCallbackData.filter())
-# async def open_target(callback: CallbackQuery, callback_data: ShowTargetCallbackData, interface: Interface):
-#     await interface.targets_manager.target.open(target_id=callback_data.id)
-#
-#
-# @targets_router.callback_query(F.data == "target")
-# async def open_target(callback: CallbackQuery, callback_data: ShowTargetCallbackData, interface: Interface):
-#     await interface.targets_manager.target.open()
-#
-#
-# @targets_router.callback_query(F.data == "invert_completed")
-# async def invert_completed(callback: CallbackQuery, interface: Interface):
-#     await interface.targets_manager.target.invert_complete()
-#
-#
-# ########################################################################################################################
-#
-#
-# @targets_router.callback_query(F.data == "update_target_name")
-# async def open_update_target_name(callback: CallbackQuery, interface: Interface):
-#     await interface.targets_manager.update_target_name.open()
-#
-#
-# @targets_router.message(StateFilter(States.update_target_name), F.text)
-# async def update_target_name(message: Message, interface: Interface):
-#     await interface.targets_manager.update_target_name(message.text)
-#     await message.delete()
-#
-#
-# ########################################################################################################################
-#
-#
-# @targets_router.callback_query(F.data == "update_target_description")
-# async def open_update_target_description(callback: CallbackQuery, interface: Interface):
-#     await interface.targets_manager.update_target_description.open()
-#
-#
-# @targets_router.message(StateFilter(States.update_target_description), F.text)
-# async def update_target_description(message: Message, interface: Interface):
-#     await interface.targets_manager.update_target_description(message.text)
-#     await message.delete()
-#
-#
-# ########################################################################################################################
-#
-#
-# @targets_router.callback_query(F.data == "conform_delete_target")
-# async def open_conform_delete_target(callback: CallbackQuery, interface: Interface):
-#     await interface.targets_manager.conform_delete_target.open()
-#
-#
-# @targets_router.callback_query(F.data == "delete_target")
-# async def delete_target(callback: CallbackQuery, interface: Interface):
-#     await interface.targets_manager.targets_control.delete_target()

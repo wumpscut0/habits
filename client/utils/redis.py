@@ -101,14 +101,6 @@ class Storage:
         self.storage.set(f"first_name:{self.user_id}", data)
 
     @property
-    def admins(self):
-        return self.storage.get(f"admins")
-
-    @admins.setter
-    def admins(self, data: Any):
-        self.storage.set(f"admins", data)
-
-    @property
     def user_token(self):
         return self.storage.get(f"token:{self.user_id}")
 
@@ -123,14 +115,6 @@ class Storage:
     @hour.setter
     def hour(self, data: Any):
         self.storage.set(f"hour:{self.user_id}", data)
-
-    @property
-    def minute(self):
-        return self.storage.get(f"minute:{self.user_id}")
-
-    @minute.setter
-    def minute(self, data: Any):
-        self.storage.set(f"minute:{self.user_id}", data)
 
     @property
     def message_ids_pull(self):
@@ -173,11 +157,11 @@ class Storage:
 
     @property
     def email(self):
-        return self.storage.getex(f"email:{self.user_id}")
+        return self.storage.get(f"email:{self.user_id}")
 
     @email.setter
     def email(self, data: Any):
-        self.storage.setex(f"email:{self.user_id}", EMAIL_EXPIRATION, data)
+        self.storage.set(f"email:{self.user_id}", data)
 
     @property
     def password(self):

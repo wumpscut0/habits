@@ -14,7 +14,6 @@ from client.handlers.profile import profile_router
 from client.handlers.targets import targets_router
 
 
-
 class MessagePrivateFilter:
     def __call__(self, message: Message):
         return message.chat.type == "private"

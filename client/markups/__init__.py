@@ -22,7 +22,7 @@ class Temp(InitializeMarkupInterface):
 
 
 class Back(InitializeMarkupInterface):
-    def __init__(self, *, callback_data: str | CallbackData = "return_to_context", mark=f"{Emoji.BACK}", text="Back"):
+    def __init__(self, *, callback_data: str | CallbackData = "return_to_context", mark="", text=F"{Emoji.BACK} Back"):
         super().__init__()
         self.back = ButtonWidget(mark=mark, text=text, callback_data=callback_data)
         self.text_message_markup.add_button_in_new_row(self.back)

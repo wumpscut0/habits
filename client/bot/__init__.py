@@ -11,7 +11,7 @@ from client.markups import Info, InitializeMarkupInterface
 from client.markups.core import TextMessageMarkup, InitializeApiMarkupInterface
 from client.markups.specific import TitleScreen
 from client.utils import Emoji
-from client.utils.loggers import errors
+from client.utils.loggers import errors, info
 from client.utils.redis import Storage
 
 
@@ -19,11 +19,15 @@ class BotCommands:
     bot_commands = [
         BotCommand(
             command="/start",
-            description="Get title screen"
+            description=f"Get title screen {Emoji.ZAP}"
         ),
         BotCommand(
             command="/exit",
-            description="Close interface"
+            description=f"Close interface {Emoji.ZZZ}"
+        ),
+        BotCommand(
+            command="/report",
+            description=f"Send report {Emoji.BUG + Emoji.SHINE_STAR}"
         ),
     ]
 
@@ -35,12 +39,16 @@ class BotCommands:
     def exit(cls):
         return Command(cls.bot_commands[1].command.lstrip('/'))
 
+    @classmethod
+    def report(cls):
+        return Command(cls.bot_commands[2].command.lstrip('/'))
+
 
 class BotControl:
     bot = Bot(os.getenv('TOKEN'), parse_mode='HTML')
-    api = Api()
 
-    def __init__(self, user_id: int, state: FSMContext | None = None, contextualize=True):
+    def __init__(self, user_id: int, state: FSMContext | None = None, contextualize: bool = True):
+        self.api = Api()
         self._user_id = user_id
         self._state = state
         self.storage = Storage(user_id)
@@ -69,8 +77,8 @@ class BotControl:
         if isinstance(text_message_markup, (InitializeMarkupInterface, InitializeApiMarkupInterface)):
             text_message_markup = text_message_markup.text_message_markup
 
-        if self.contextualize:
-            await self._contextualize_chat()
+        # if self.contextualize:
+        #     await self._contextualize_chat()
 
         if self._state is not None:
             await self._state.set_state(text_message_markup.state)
@@ -127,14 +135,18 @@ class BotControl:
             elif InitializeApiMarkupInterface in initializer.__bases__:
                 await self.update_text_message(await initializer(*args, **kwargs).init())
             else:
-                errors.critical("Incorrect initializer in context.")
+                errors.critical(f"Incorrect initializer in context.\n"
+                                f"Initializer: {initializer}\n"
+                                f"Args: {args}"
+                                f"Kwargs: {kwargs}")
                 raise ValueError
         except (AttributeError, ValueError, BaseException) as e:
             # If we change code with context in redis, then exist chance work this exception
             errors.error(f"broken contex {e}")
             self.set_context(TitleScreen, self._user_id)
             await self.update_text_message(
-                Info("Application updated. Please sign in again.")
+                Info(f"Application updated {Emoji.UP}\n"
+                     f"Please sign in again {Emoji.DOOR}")
             )
 
     async def send_message_to_admin(self, message: str):
@@ -168,3 +180,27 @@ class BotControl:
                 return True
             except TelegramBadRequest:
                 pass
+
+    async def api_status_code_processing(self, code: int, *expected_codes: int) -> bool:
+        if code in expected_codes:
+            return True
+
+        if code == 401:
+            info.warning(f"Trying unauthorized access. User: {self.user_id}")
+            self.set_context(TitleScreen, self.user_id)
+            await self.update_text_message(Info(
+                f"Your session expired {Emoji.CRYING_CAT} Please, sign in again {Emoji.DOOR}"
+            ))
+
+        elif code == 500:
+            errors.critical(f"Internal server error.")
+            await self.update_text_message(Info(
+                f"Internal server error {Emoji.CRYING_CAT + Emoji.BROKEN_HEARTH} Sorry"
+            ))
+        else:
+            errors.critical(f"Unexpected status from API: {code}")
+            await self.update_text_message(Info(
+                f"Something broken {Emoji.CRYING_CAT + Emoji.BROKEN_HEARTH} Sorry"
+            ))
+
+        return False

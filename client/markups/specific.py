@@ -1,16 +1,13 @@
-
+import time
+from datetime import datetime
 
 from aiogram.filters.callback_data import CallbackData
-from passlib.handlers.pbkdf2 import pbkdf2_sha256
 from zxcvbn import zxcvbn
 
-from client.api import Api
 from client.bot.FSM import States
-from client.markups import InitializeMarkupInterface, Back, Conform, Info
-from client.markups.core import TextMarkup, TextWidget, KeyboardMarkup, ButtonWidget, DataTextWidget, TextMessageMarkup, \
-    InitializeApiMarkupInterface
-from client.utils import Emoji, config
-from client.utils.mailing import Mailing
+from client.markups import InitializeMarkupInterface, Back, Conform, Input
+from client.markups.core import TextWidget, ButtonWidget, DataTextWidget, InitializeApiMarkupInterface
+from client.utils import Emoji
 
 
 class TitleScreen(InitializeApiMarkupInterface):
@@ -44,17 +41,19 @@ class TitleScreen(InitializeApiMarkupInterface):
 
 
 class AuthenticationWithPassword(InitializeApiMarkupInterface):
-    def __init__(self, user_id: str):
+    def __init__(self, user_id: str, text=f'{Emoji.KEY} Enter the password'):
         self._user_id = user_id
+        self._input = Input(text)
         super().__init__(States.input_text_sign_in_with_password)
 
     async def init(self):
-        info = TextWidget(text=f'{Emoji.KEY} Enter the password')
-        self.text_message_markup.add_text_row(info)
         button = await self._init_reset_password(self._user_id)
         if button is not None:
-            self.text_message_markup.add_button_in_new_row(button)
-        self.text_message_markup.attach(Back())
+            self.text_message_markup.add_buttons_in_new_row(button)
+            self.text_message_markup.attach(self._input)
+        else:
+            self.text_message_markup.attach(self._input)
+
         return self
 
     async def _init_reset_password(self, user_id: str):
@@ -83,6 +82,7 @@ class PasswordResume(InitializeMarkupInterface):
             yes_text="Conform",
             no_text="Cancel",
             yes_callback_data="update_password",
+            no_callback_data="input_password"
         ).text_message_markup
 
     @classmethod
@@ -125,13 +125,14 @@ class Options(InitializeApiMarkupInterface):
     def __init__(self, user_id: str):
         super().__init__()
         self._user_id = user_id
-        self.time = DataTextWidget(text=f"{Emoji.BELL + Emoji.CLOCK} Notification time")
+        self.local_time = DataTextWidget(text=f"{Emoji.WATCH} Server time", data=f"{datetime.now().strftime('%d.%m.%y %H:%M')} UTC{time.tzname[0]}")
+        self.time = DataTextWidget(text=f"{Emoji.BELL} Notification time")
         self.delete_password = ButtonWidget(text=f"{Emoji.KEY + Emoji.DENIAL} Delete password", callback_data="delete_password")
         self.input_password = ButtonWidget(callback_data="input_password")
-        self.delete_email = ButtonWidget(text=f"{Emoji.ENVELOPE + Emoji.DENIAL} Delete email", callback_data="delete_email")
+        self.delete_email = ButtonWidget(text=f"{Emoji.EMAIL + Emoji.DENIAL} Delete email", callback_data="delete_email")
         self.input_email = ButtonWidget(callback_data="input_email")
         self.change_notifications = ButtonWidget(
-            text=f"{Emoji.BELL + Emoji.CLOCK} Change notification time",
+            text=f"{Emoji.BELL} Change notification time",
             callback_data="change_notification_time"
         )
 
@@ -140,19 +141,19 @@ class Options(InitializeApiMarkupInterface):
         if code == 200:
             time_ = data["notification_time"]
             self.time.data = f"{time_['hour']}:{str(time_['minute']).zfill(2)}"
-            self.text_message_markup.add_text_row(self.time)
+            self.text_message_markup.add_texts_rows(self.local_time, self.time)
             if data["hash"]:
-                self.input_password.text = f'{Emoji.KEY + Emoji.UP} Change password'
+                self.input_password.text = f'{Emoji.KEY} Change password'
                 self.text_message_markup.add_buttons_in_new_row(self.input_password, self.delete_password)
             else:
-                self.input_password.text = f"{Emoji.KEY + Emoji.PLUS} Add password"
+                self.input_password.text = f"{Emoji.KEY} Add password"
                 self.text_message_markup.add_button_in_new_row(self.input_password)
 
             if data["email"]:
-                self.input_email.text = f'{Emoji.ENVELOPE + Emoji.UP} Change email'
+                self.input_email.text = f'{Emoji.EMAIL} Change email'
                 self.text_message_markup.add_buttons_in_new_row(self.input_email, self.delete_email)
             else:
-                self.input_email.text = f"{Emoji.ENVELOPE + Emoji.PLUS} Add email"
+                self.input_email.text = f"{Emoji.EMAIL} Add email"
                 self.text_message_markup.add_button_in_new_row(self.input_email)
         else:
             self.text_message_markup.add_text_row(TextWidget(text=f"{Emoji.DENIAL} Internal server error"))
@@ -162,166 +163,35 @@ class Options(InitializeApiMarkupInterface):
         return self
 
 
-# class InputVerifyEmailCode(TextMarkup):
-#     def __init__(self, interface):
-#         super().__init__(
-#             interface,
-#             text_map=TextMap(
-#                 {
-#                     "action": TextWidget(
-#                         text=f'{Emoji.LOCK_AND_KEY} Enter verify code'
-#                     )
-#                 }
-#             ),
-#             markup_map=MarkupMap(
-#                 [
-#                     {
-#                         "back": ButtonWidget(text=f'{Emoji.CYCLE} Change email', callback_data="create_email")
-#                     }
-#                 ]
-#             ),
-#             state=States.input_verify_email_code
-#         )
-#
-#     async def __call__(self, verify_code):
-#         await self._interface.temp_message()
-#         verify_code_ = storage.getex(f"verify_email_code:{self._interface._user_id}")
-#         if verify_code_ is None:
-#             email = storage.get(f"email:{self._interface._user_id}")
-#             storage.setex(f"verify_email_code:{self._interface._user_id}", VERIFY_CODE_EXPIRATION, await Mailing.verify_email(email))
-#             await self._interface.update_feedback(f"Verify code expired. New code sended on email: {email}", type_="info")
-#             await self.open()
-#         elif verify_code != verify_code_:
-#             await self._interface.update_feedback(f'Wrong verify code', type_="error")
-#             await self.open()
-#         else:
-#             await self._interface.basic_manager.options.update_email()
-#
-#
-# class NotificationHourCallbackData(CallbackData, prefix="notification_hour"):
-#     hour: int
-#
-#
-# class ChangeNotificationsHour(TextMarkup):
-#     def __init__(self, interface):
-#         super().__init__(
-#             interface,
-#             TextMap(
-#                 {
-#                     "info": TextWidget(f"{Emoji.CLOCK} Choose notification hour")
-#                 }
-#             ),
-#             MarkupMap(
-#                 [
-#                     {
-#                         str(hour): ButtonWidget(
-#                             text=str(hour),
-#                             callback_data=NotificationHourCallbackData(hour=hour)
-#                         ) for hour in range(start, start + 8)
-#                     }
-#                     for start in range(0, 24, 8)
-#                 ] + [
-#                     {
-#                         "back": ButtonWidget(text=f"{Emoji.BACK} Cancel", callback_data='options')
-#                     }
-#                 ]
-#             )
-#         )
-#
-#     async def __call__(self, hour: int):
-#         storage.set(f"hour:{self._interface._user_id}", hour)
-#         await self._interface.basic_manager.change_notification_minute.open()
-#
-#
-# class NotificationMinuteCallbackData(CallbackData, prefix="notification_minute"):
-#     minute: int
-#
-#
-# class ChangeNotificationsMinute(TextMarkup):
-#     def __init__(self, interface):
-#         super().__init__(
-#             interface,
-#             TextMap(
-#                 {
-#                     "info": TextWidget(f"{Emoji.CLOCK} Choose notification minute")
-#                 }
-#             ),
-#             MarkupMap(
-#                 [
-#                     {
-#                         str(minute): ButtonWidget(
-#                             text=str(minute),
-#                             callback_data=NotificationMinuteCallbackData(minute=minute)
-#                         ) for minute in range(start, start + 8)
-#                     }
-#                     for start in range(0, 56, 8)
-#                 ] + [
-#                     {
-#                         str(minute): ButtonWidget(
-#                             text=str(minute),
-#                             callback_data=NotificationMinuteCallbackData(minute=minute)
-#                         ) for minute in range(56, 60)
-#                     }
-#                 ] + [
-#                     {
-#                         "back": ButtonWidget(text=f"{Emoji.BACK} Cancel", callback_data='options')
-#                     }
-#                 ]
-#             )
-#         )
-#
-#     async def __call__(self, minute: int):
-#         storage.set(f"minute:{self._interface._user_id}", minute)
-#         await self._interface.basic_manager.options.update_notifications_time()
-#
-#
-# class FeedbackMixin:
-#     _feedback_headers = {
-#         "default": DataTextWidget(header=f'{Emoji.REPORT} Feedback'),
-#         "info": DataTextWidget(header=f"{Emoji.INFO} Info"),
-#         "error": DataTextWidget(header=f"{Emoji.DENIAL} Error"),
-#     }
-#
-#
+class NotificationsHourCallbackData(CallbackData, prefix="notification_hour"):
+    hour: int
 
-#
-#
-# class InputVerifyCodeResetPassword(TextMarkup):
-#     def __init__(self, interface):
-#         super().__init__(
-#             interface,
-#             text_map=TextMap(
-#                 {
-#                     "action": TextWidget(
-#                         text=f'{Emoji.LOCK_AND_KEY} Enter verify code'
-#                     )
-#                 }
-#             ),
-#             markup_map=MarkupMap(
-#                 [
-#                     {
-#                         "back": ButtonWidget(text=f'{Emoji.BACK} Back', callback_data="title_screen")
-#                     }
-#                 ]
-#             ),
-#             state=States.input_verify_code_reset_password
-#         )
-#
-#     async def __call__(self, verify_code):
-#         await self._interface.temp_message()
-#         verify_code_ = storage.getex(f"verify_email_code:{self._interface._user_id}")
-#         if verify_code_ is None:
-#             async with self._interface.session.get(
-#                     f'/get_user_email/{await self._interface.encoded_chat_id()}') as response:
-#                 if response.status == 200:
-#                     verify_code = await Mailing.verify_email(await response.text())
-#                     storage.setex(f"verify_email_code:{self._interface._user_id}", VERIFY_CODE_EXPIRATION, verify_code)
-#                     self._interface.update_feedback("Verify code expired. New code sent on your email.", type_="info")
-#                     await self.open()
-#                 else:
-#                     await self._interface.handling_unexpected_error()
-#         elif verify_code != verify_code_:
-#             self._interface.update_feedback("Wrong verify code", type_="info")
-#             await self.open()
-#         else:
-#             await self._interface.basic_manager.input_password.open()
+
+class ChangeNotificationsHour(InitializeMarkupInterface):
+    def __init__(self):
+        super().__init__()
+        self._info = TextWidget(text=f"{Emoji.CLOCK} Choose notification hour")
+        self._hours = (
+            ButtonWidget(text=str(hour), callback_data=NotificationsHourCallbackData(hour=hour))
+            for hour in range(24)
+        )
+        self.text_message_markup.add_text_row(self._info)
+        self.text_message_markup.add_buttons_in_last_row(*self._hours)
+        self.text_message_markup.attach(Back(text=F"{Emoji.DENIAL} Cancel"))
+
+
+class NotificationsMinuteCallbackData(CallbackData, prefix="notification_minute"):
+    minute: int
+
+
+class ChangeNotificationsMinute(InitializeMarkupInterface):
+    def __init__(self):
+        super().__init__()
+        self._info = TextWidget(text=f"{Emoji.CLOCK} Choose notification minute")
+        self._minutes = (
+            ButtonWidget(text=str(minute), callback_data=NotificationsMinuteCallbackData(minute=minute))
+            for minute in range(60)
+        )
+        self.text_message_markup.add_text_row(self._info)
+        self.text_message_markup.add_buttons_in_last_row(*self._minutes)
+        self.text_message_markup.attach(Back(text=F"{Emoji.DENIAL} Cancel"))

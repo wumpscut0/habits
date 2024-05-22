@@ -17,7 +17,7 @@ targets_router = APIRouter(prefix="/targets")
 @targets_router.get('/')
 async def get_targets(payload: Annotated[Payload, Depends(Authority.user_authorization)]):
     async with Session.begin() as session:
-        return await TargetsQueries.get_targets(session, payload.sub)
+        return await TargetsQueries.get_targets(session, payload["sub"])
 
 
 @targets_router.get("/{target_id}", dependencies=[Depends(Authority.user_authorization)])

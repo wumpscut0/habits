@@ -25,62 +25,53 @@ basic_router = Router()
 
 @basic_router.callback_query(F.data == 'invert_notifications')
 async def invert_notifications(callback: CallbackQuery, bot_control: BotControl):
-    data, code = await bot_control.api.invert_notifications(bot_control.user_id)
-    if code == 200:
+    _, code = await bot_control.api.invert_notifications(bot_control.user_id)
+    if await bot_control.api_status_code_processing(code, 200):
         data, code = await bot_control.api.get_user(bot_control.user_id)
-        if code == 200:
-            notifications = data.get("notifications")
-            assert notifications is not None
-            if notifications:
+        if await bot_control.api_status_code_processing(code, 200):
+            if data["notifications"]:
                 await callback.answer("Notifications online")
             else:
                 await callback.answer("Notifications offline")
-
-    await bot_control.update_text_message(await TitleScreen(bot_control.user_id).init())
+            await bot_control.update_text_message(await TitleScreen(bot_control.user_id).init())
 
 
 @basic_router.callback_query(F.data == 'authorization')
 async def authorization(callback: CallbackQuery, bot_control: BotControl):
     data, code = await bot_control.api.get_user(bot_control.user_id)
-    if code == 200:
+    if await bot_control.api_status_code_processing(code, 200):
         if data["hash"]:
             await bot_control.update_text_message(await AuthenticationWithPassword(bot_control.user_id).init())
-            return
         else:
             data, code = await bot_control.api.authentication(bot_control.user_id)
-            if code == 200:
+            if await bot_control.api_status_code_processing(code, 200):
                 bot_control.storage.user_token = data["access_token"]
                 bot_control.set_context(Profile, bot_control.storage.first_name)
                 await bot_control.update_text_message(Profile(bot_control.storage.first_name))
-                return
-
-    await callback.answer("Internal server error")
 
 
 @basic_router.message(StateFilter(States.input_text_sign_in_with_password), F.text)
 async def password_accept_input(message: Message, bot_control: BotControl):
-    data, code = await bot_control.api.authentication(bot_control.user_id, message.text)
+    password = message.text
     await message.delete()
 
-    if code == 200:
-        bot_control.storage.user_token = data["access_token"]
-        bot_control.set_context(Profile, bot_control.storage.first_name)
-        await bot_control.update_text_message(Profile(bot_control.storage.first_name))
-        return
-    elif code == 401:
-        await bot_control.update_text_message(Input(
-            f"{Emoji.DENIAL} Wrong password. Try Again.",
-            state=States.input_text_sign_in_with_password
-        ))
-        return
-
-    await bot_control.update_text_message(Info("Internal server error"))
+    data, code = await bot_control.api.authentication(bot_control.user_id, password)
+    if await bot_control.api_status_code_processing(code, 200, 401):
+        if code == 200:
+            bot_control.storage.user_token = data["access_token"]
+            bot_control.set_context(Profile, bot_control.storage.first_name)
+            await bot_control.update_text_message(Profile(bot_control.storage.first_name))
+        elif code == 401:
+            await bot_control.update_text_message(await AuthenticationWithPassword(
+                bot_control.user_id,
+                f"Wrong password {Emoji.CRYING_CAT} Try Again {Emoji.KEY}"
+            ).init())
 
 
 @basic_router.callback_query(F.data == "reset_password")
 async def reset_password(callback: CallbackQuery, bot_control: BotControl):
-    data, code = await bot_control.api.get_user()
-    if code == 200:
+    data, code = await bot_control.api.get_user(bot_control.user_id)
+    if await bot_control.api_status_code_processing(code, 200):
         email = data["email"]
         await bot_control.update_text_message(Temp())
         verify_code = await Mailing.verify_email(email)
@@ -91,15 +82,13 @@ async def reset_password(callback: CallbackQuery, bot_control: BotControl):
                 )
             )
             return
+
         bot_control.storage.email = email
         bot_control.storage.verify_code = verify_code
         await bot_control.update_text_message(Input(
-            f'Verify code sent on your email {Emoji.ENVELOPE} Enter verify code {Emoji.LOCK_AND_KEY}',
+            f'Verify code sent on your email {Emoji.INCOMING_ENVELOPE}',
             state=States.input_text_verify_code_reset_password
         ))
-        return
-
-    await callback.answer("Internal server error")
 
 
 @basic_router.message(StateFilter(States.input_text_verify_code_reset_password), F.text)
@@ -113,14 +102,14 @@ async def verify_code_to_reset_password_accept_input(message: Message, bot_contr
         bot_control.storage.verify_code = await Mailing.verify_email(bot_control.storage.email)
         await bot_control.update_text_message(Input(
             f'Verify code expired {Emoji.HOURGLASS_END}'
-            f' New code sent on your email {Emoji.ENVELOPE + Emoji.LOCK_AND_KEY}',
+            f' New code sent on your email {Emoji.INCOMING_ENVELOPE}',
             state=States.input_text_verify_code_reset_password
         ))
         return
 
-    if input_verify_code != verify_code:
+    if input_verify_code != str(verify_code):
         await bot_control.update_text_message(Input(
-            f'Wrong verify code {Emoji.CRYING_CAT} Try again {Emoji.LOCK_AND_KEY}',
+            f'Wrong verify code {Emoji.CRYING_CAT} Try again',
             state=States.input_text_verify_code_reset_password
         ))
         return
@@ -138,7 +127,7 @@ async def new_password_accept_input(message: Message, bot_control: BotControl):
 
     if len(password) > MAX_PASSWORD_LENGTH:
         await bot_control.update_text_message(Input(
-            f'{Emoji.DENIAL} Maximum password length is {MAX_PASSWORD_LENGTH} symbols {Emoji.CRYING_CAT}'
+            f'Maximum password length is {MAX_PASSWORD_LENGTH} symbols {Emoji.CRYING_CAT}'
             f' Try again {Emoji.KEY}',
             state=States.input_text_password
         ))
@@ -176,127 +165,9 @@ async def repeat_password_accept_input(message: Message, bot_control: BotControl
 
 @basic_router.callback_query(F.data == "update_password")
 async def update_password(callback: CallbackQuery, bot_control: BotControl):
-    data, code = await bot_control.api.update_password(bot_control.user_id, bot_control.storage.hash)
-    if code == 200:
+    _, code = await bot_control.api.update_password(bot_control.user_id, bot_control.storage.hash)
+    if await bot_control.api_status_code_processing(code, 200):
         bot_control.set_context(TitleScreen, bot_control.user_id)
         await bot_control.update_text_message(Info(
             f'Password updated {Emoji.KEY + Emoji.OK}'
         ))
-        return
-
-    await callback.answer("Internal server error")
-
-#
-#
-# @basic_router.message(StateFilter(States.sign_in_with_password), F.text)
-# async def authorization_with_password(message: Message, interface: Interface):
-#     await interface.basic_manager.authorization_with_password(message.text)
-#     await message.delete()
-#
-#
-# ########################################################################################################################
-#
-#
-# @basic_router.callback_query(F.data == 'profile')
-# async def open_profile(callback: CallbackQuery, interface: Interface):
-#     await interface.basic_manager.profile.open()
-#
-#
-# ########################################################################################################################
-#
-#
-# @basic_router.callback_query(F.data == "options")
-# async def open_options(callback: CallbackQuery, interface: Interface):
-#     await interface.basic_manager.options.open()
-#
-#
-# ########################################################################################################################
-#
-#
-# @basic_router.callback_query(F.data == "update_password")
-# async def update_password(callback: CallbackQuery, interface: Interface):
-#     await interface.basic_manager.options.update_password()
-#
-#
-# @basic_router.callback_query(F.data == "reset_password")
-# async def reset_password(callback: CallbackQuery, interface: Interface):
-#     await interface.basic_manager.authorization_with_password.reset_password()
-#
-#
-# @basic_router.callback_query(F.data == "input_password")
-# async def open_input_password(callback: CallbackQuery, interface: Interface):
-#     await interface.basic_manager.input_password.open()
-#
-#
-# @basic_router.callback_query(F.data == "delete_password")
-# async def delete_password(callback: CallbackQuery, interface: Interface):
-#     await interface.basic_manager.options.delete_password()
-#
-#
-# @basic_router.message(StateFilter(States.input_password), F.text)
-# async def input_password(message: Message, interface: Interface):
-#     await interface.basic_manager.input_password(message.text)
-#     await message.delete()
-#
-#
-# @basic_router.message(StateFilter(States.repeat_password), F.text)
-# async def repeat_password(message: Message, interface: Interface):
-#     await interface.basic_manager.repeat_password(message.text)
-#     await message.delete()
-#
-#
-# @basic_router.message(StateFilter(States.input_verify_code_reset_password), F.text)
-# async def input_verify_code_reset_password(message: Message, interface: Interface):
-#     await interface.basic_manager.input_verify_code_reset_password(message.text)
-#     await message.delete()
-#
-#
-# ########################################################################################################################
-#
-#
-# @basic_router.callback_query(F.data == 'input_email')
-# async def open_create_email(callback: CallbackQuery, interface: Interface):
-#     await interface.basic_manager.input_email.open()
-#
-#
-# @basic_router.callback_query(F.data == 'delete_email')
-# async def open_create_email(callback: CallbackQuery, interface: Interface):
-#     await interface.basic_manager.options.delete_email()
-#
-#
-# @basic_router.message(StateFilter(States.input_email), F.text)
-# async def input_email(message: Message, interface: Interface):
-#     await interface.basic_manager.input_email(message.text)
-#     await message.delete()
-#
-#
-# @basic_router.message(StateFilter(States.input_verify_email_code), F.text)
-# async def input_verify_email_code(message: Message, interface: Interface):
-#     await interface.basic_manager.input_verify_email_code(message.text)
-#     await message.delete()
-#
-#
-# ########################################################################################################################
-#
-#
-# @basic_router.callback_query(F.data == "change_notification_time")
-# async def open_change_notification_time(callback: CallbackQuery, interface: Interface):
-#     await interface.basic_manager.change_notification_hour.open()
-#
-#
-# @basic_router.callback_query(NotificationHourCallbackData.filter())
-# async def change_notification_time(callback: CallbackQuery, callback_data: NotificationHourCallbackData, interface: Interface):
-#     await interface.basic_manager.change_notification_hour(callback_data.hour)
-#
-#
-# @basic_router.callback_query(NotificationMinuteCallbackData.filter())
-# async def change_notification_time(callback: CallbackQuery, callback_data: NotificationMinuteCallbackData, interface: Interface):
-#     await interface.basic_manager.change_notification_minute(callback_data.minute)
-#
-#
-# @basic_router.callback_query(F.data == "close_notification")
-# async def close_notification(callback: CallbackQuery):
-#     try:
-#         await callback.message.delete()
-#     except TelegramBadRequest:
-#         await callback.message.edit_text("Deleted")

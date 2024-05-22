@@ -2,6 +2,7 @@ from typing import Annotated
 from datetime import time
 
 from fastapi import Depends, APIRouter
+from starlette.responses import JSONResponse
 
 from server.database import Session
 from server.api.models import UpdatePasswordApiModel, NotificationTimeApiModel, EmailApiModel, \
@@ -47,7 +48,7 @@ async def delete_password(payload: Annotated[Payload, Depends(Authority.user_aut
         await PasswordQueries.delete_password(session, payload["sub"])
 
 
-@users_router.put('/email')
+@users_router.put('/email', status_code=201)
 async def update_email(email_api_model: EmailApiModel, payload: Annotated[Payload, Depends(Authority.user_authorization)]):
     async with Session.begin() as session:
         await EmailQueries.update(session, payload["sub"], email_api_model.email)
@@ -65,7 +66,7 @@ async def invert_notifications(user_id_api_model: UserIdApiModel):
         await NotificationsQueries.invert(session, user_id_api_model.user_id)
 
 
-@users_router.put("/notification")
+@users_router.put("/notifications")
 async def change_notification_time(time_: NotificationTimeApiModel, payload: Annotated[Payload, Depends(Authority.user_authorization)]):
     async with Session.begin() as session:
         await NotificationsQueries.update(session, payload["sub"], time(**time_.model_dump()))

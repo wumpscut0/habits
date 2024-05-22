@@ -52,7 +52,7 @@ class UserApiModel(BaseModel):
                     400,
                     detail=f'Maximum email length is {MAX_EMAIL_LENGTH}'
                 )
-            if not re.fullmatch(r'[a-zA-Z0-9]+@[a-zA-Z]+\.[a-zA-Z]', value):
+            if not re.fullmatch(r'[a-zA-Z0-9]+@[a-zA-Z]+\.[a-zA-Z]+', value):
                 raise HTTPException(
                     400,
                     detail=f'Invalid email format'

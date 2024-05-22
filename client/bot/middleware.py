@@ -23,10 +23,8 @@ class BuildBotControl(BaseMiddleware):
             return await handler(event, data)
         except BaseException as e:
             errors.critical(f"An error occurred when execution some handler:\n{e}")
-            await bot_control.update_text_message(
-                Info(f"Something went wrong {Emoji.CRYING_CAT}\n"
-                     f"You can write feedback by sending any message to the chat room."),
-                )
+            await bot_control.update_text_message(Info(f"Something went wrong {Emoji.CRYING_CAT + Emoji.BROKEN_HEARTH}"
+                                                       f" Sorry"))
             raise e
 
     @classmethod

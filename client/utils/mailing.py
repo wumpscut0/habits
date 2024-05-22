@@ -20,7 +20,7 @@ class Mailing:
         return ''.join((secrets.choice(digits) for _ in range(6)))
 
     @classmethod
-    async def verify_email(cls, receiver):
+    async def verify_email(cls, receiver: str):
         verify_code = await cls._generate_secret_key()
         message = MIMEText(f'Your verify code: {verify_code}')
         message['To'] = receiver

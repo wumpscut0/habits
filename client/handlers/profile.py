@@ -2,11 +2,8 @@ from aiogram import Router, F
 from aiogram.types import CallbackQuery
 
 from client.bot import BotControl
-from client.bot.FSM import States
-from client.markups import Input, Info
 
 from client.markups.specific import Options, TitleScreen, Profile
-from client.utils import Emoji
 
 profile_router = Router()
 

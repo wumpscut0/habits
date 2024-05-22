@@ -40,7 +40,7 @@ class Authority:
         try:
             return jwt.decode(token, key=os.getenv('JWT'), algorithms=cls._jwt_algorithm)
         except jwt.PyJWTError:
-            HTTPException(
+            raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Could not validate credentials",
                 headers={"WWW-Authenticate": "Bearer"},

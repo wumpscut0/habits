@@ -76,10 +76,7 @@ class ShowTargetCallbackData(CallbackData, prefix='show_target'):
 #         name = storage.get(f"target_name:{user_id}")
 #         border = storage.get(f"target_border:{user_id}")
 #
-#         async with self._interface.session.post('/targets', json={
-#             "name": name,
-#             "border_progress": border
-#         }, headers={"Authorization": self._interface.token}) as response:
+#
 #             response = await self._interface.response_middleware(response, 201)
 #             if response is not None:
 #                 await self._interface.update_feedback(f'{Emoji.SPROUT} Target with name {name} created')
@@ -87,10 +84,7 @@ class ShowTargetCallbackData(CallbackData, prefix='show_target'):
 #                 await self._interface.targets_manager.targets_control.open()
 #
 #     async def delete_target(self):
-#         async with self._interface.session.delete(
-#             f'/targets/{storage.get(f"target_id:{self._interface._user_id}")}',
-#             headers={"Authorization": self._interface.token}
-#         ) as response:
+#
 #             response = await self._interface.response_middleware(response)
 #             if response is not None:
 #                 await self._interface.update_feedback("Target deleted", type_="info")
@@ -119,15 +113,7 @@ class ShowTargetCallbackData(CallbackData, prefix='show_target'):
 #         )
 #
 #     async def __call__(self, name: str):
-#         if len(name) > MAX_NAME_LENGTH:
-#             await self._interface.update_feedback(f"Maximum name length is {MAX_NAME_LENGTH} simbols", type_="error")
-#             await self.open()
-#         elif not re.fullmatch(r'[\w\s]+', name, flags=re.I):
-#             await self._interface.update_feedback(f"Name must contains only latin symbols or _ or spaces or digits", type_="error")
-#             await self.open()
-#         else:
-#             storage.set(f"target_name:{self._interface._user_id}", name)
-#             await self._interface.targets_manager.input_target_border.open()
+#
 #
 #
 # class InputTargetBorder(TextMarkup):
@@ -155,16 +141,7 @@ class ShowTargetCallbackData(CallbackData, prefix='show_target'):
 #         await super().open()
 #
 #     async def __call__(self, border: str):
-#         try:
-#             border = int(border)
-#         except ValueError:
-#             await self._interface.update_feedback(f"Border value must be integer")
-#         if not MIN_BORDER_RANGE <= border <= MAX_BORDER_RANGE:
-#             await self._interface.update_feedback(f'Border range must be at {MIN_BORDER_RANGE} to {MAX_BORDER_RANGE}', type_="error")
-#             await self.open()
-#         else:
-#             storage.set(f"target_border:{self._interface._user_id}", int(border))
-#             await self._interface.targets_manager.targets_control.create_target()
+#
 #
 #
 # class Targets(TextMarkup):
@@ -257,7 +234,7 @@ class ShowTargetCallbackData(CallbackData, prefix='show_target'):
 #
 #     async def open(self, **kwargs):
 #         storage.set(f"target_id:{self._interface._user_id}", kwargs["target_id"])
-#         async with (self._interface.session.get(f"/targets/{kwargs['target_id']}", headers={"Authorization": self._interface.token}) as response):
+
 #             response = await self._interface.response_middleware()
 #             if response is not None:
 #                 target = await response.json()
@@ -282,7 +259,7 @@ class ShowTargetCallbackData(CallbackData, prefix='show_target'):
 #
 #     async def invert_complete(self):
 #         target_id = storage.get(f"target_id:{self._interface._user_id}")
-#         async with self._interface.session.patch(f'/targets/{target_id}/invert', headers={"Authorization": self._interface.token}) as response:
+
 #             response = await self._interface.response_middleware(response)
 #             if response is not None:
 #                 self.markup_map['completed'].text = f'{Emoji.DENIAL} Incomplete' if response == '1' else f'{Emoji.OK} Complete'
@@ -310,21 +287,7 @@ class ShowTargetCallbackData(CallbackData, prefix='show_target'):
 #         )
 #
 #     async def __call__(self, name: str):
-#         target_id = storage.get(f"target_id:{self._interface._user_id}")
-#         if len(name) > MAX_NAME_LENGTH:
-#             await self._interface.update_feedback(f"Maximum name length is {MAX_NAME_LENGTH} simbols")
-#             await self.open()
-#         elif not re.fullmatch(r'[\w\s]+', name, flags=re.I):
-#             await self._interface.update_feedback(f"Name must contains only latin symbols or _ or spaces or digits")
-#             await self.open()
-#         else:
-#             async with self._interface.session.patch(
-#                 f'/target/{target_id}', json={"name": name},
-#                 headers={"Authorization": self._interface.token}
-#             ) as response:
-#                 response = await self._interface.response_middleware(response)
-#                 if response is not None:
-#                     await self._interface.targets_manager.target.open(target_id=target_id)
+#
 #
 #
 # class UpdateTargetDescription(TextMarkup):
@@ -348,23 +311,7 @@ class ShowTargetCallbackData(CallbackData, prefix='show_target'):
 #
 #     async def __call__(self, description: str):
 #         target_id = storage.get(f"target_id:{self._interface._user_id}")
-#         if len(description) > MAX_DESCRIPTION_LENGTH:
-#             await self._interface.update_feedback(f"Maximum description length is {MAX_DESCRIPTION_LENGTH} simbols")
-#             await self.open()
-#         elif not re.fullmatch(r'[\w\s,?!:.]+', description, flags=re.I):
-#             await self._interface.update_feedback(
-#                 f"Description must contains only latin symbols or _ or , or ? or ! or : or . or spaces or digits",
-#                 type_="error"
-#             )
-#             await self.open()
-#         else:
-#             async with self._interface.session.patch(
-#                     f'/target/{target_id}', json={"name": description},
-#                     headers={"Authorization": self._interface.token}
-#             ) as response:
-#                 response = await self._interface.response_middleware(response)
-#                 if response is not None:
-#                     await self._interface.targets_manager.target.open(target_id=target_id)
+#
 #
 #
 # class ConformDeleteTarget(TextMarkup):
@@ -458,10 +405,7 @@ class ShowTargetCallbackData(CallbackData, prefix='show_target'):
 #
 #     async def open(self, **kwargs):
 #         storage.set(f"target_id:{self._interface._user_id}", kwargs["target_id"])
-#         async with self._interface.session.get(
-#                 f"/target/{kwargs['target_id']}",
-#                 headers={"Authorization": self._interface._user_id}
-#         ) as response:
+#
 #             response = await self._interface.response_middleware(response)
 #             if response is not None:
 #                 target = await response.json()

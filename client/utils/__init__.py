@@ -24,7 +24,7 @@ class Emoji:
     DIAGRAM = "📊"
     BULB = "💡"
     GEAR = "⚙"
-    ENVELOPE = "✉️"
+    EMAIL = "📧"
     LOCK_AND_KEY = "🔐"
     PLUS = "➕"
     UP = "🆙"
@@ -59,6 +59,10 @@ class Emoji:
     UNLOCK = "🔓"
     PENCIL = "✏️"
     BROKEN_HEARTH = "💔"
+    ZZZ = "💤"
+    ZAP = "⚡️"
+    YUM = "😋"
+    WATCH = "⌚️"
 
 
 class SerializableMixin:
