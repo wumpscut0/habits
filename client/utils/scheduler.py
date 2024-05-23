@@ -10,7 +10,7 @@ from client.bot import BotControl
 from client.markups import Info
 
 from client.utils.loggers import info, errors
-from client.utils.redis import HourGlassAnimationIdsPull, Storage, CustomRedis
+from client.utils.redis import Storage, CustomRedis
 
 
 class Scheduler:
@@ -25,8 +25,7 @@ class Scheduler:
     scheduler.configure(jobstores=_jobstores, job_defaults=_job_defaults)
 
     _increase_progress_id = "increase_progress"
-    _api = Api()
-    _hour_glass_animation_ids_pull = HourGlassAnimationIdsPull()
+    _api = Api
 
     @classmethod
     def set_job_increase_progress(cls, hour=0, minute=0):
@@ -41,6 +40,11 @@ class Scheduler:
 
     @classmethod
     async def refresh_notifications(cls, user_id: str):
+        """
+        Notifications will be on in case:
+        1) User have any not marked target
+        2) User have on notifications
+        """
         user, user_code = await cls._api.get_user(user_id)
         targets, targets_code = await cls._api.get_targets(Storage(user_id).user_token)
         if user_code == 200 and targets_code == 200:
@@ -56,9 +60,11 @@ class Scheduler:
                     trigger=CronTrigger(hour=time_["hour"], minute=time_["minute"]),
                     args=(int(user_id),), replace_existing=True, id=user_id
                 )
+                info.info(f"Notifications on for user {user_id}")
             else:
                 try:
                     cls.scheduler.remove_job(job_id=user_id, jobstore="default")
+                    info.info(f"Notifications off for user {user_id}")
                 except JobLookupError:
                     pass
         else:
@@ -66,15 +72,16 @@ class Scheduler:
 
 
 class Workers:
-    @staticmethod
-    async def remainder(user_id: int):
-        await BotControl(user_id).create_text_message(Info('Don`t forget mark done target today').text_message_markup, context=False)
-        info.info(f'Remaining sent to user {user_id}')
+    _api = Api
 
     @staticmethod
-    async def increase_progress():
-        api = Api()
-        _, code = await api.increase_progress()
+    async def remainder(user_id: int):
+        await BotControl(user_id).create_text_message(Info('Don`t forget mark done target today'))
+        info.info(f'Remaining sent to user {user_id}')
+
+    @classmethod
+    async def increase_progress(cls):
+        _, code = await cls._api.increase_progress()
         if code == 200:
             info.info(f'Progress increased')
         else:
@@ -85,4 +92,3 @@ class Workers:
                 count = 0
             count += 1
             storage.set(f"not_increase_count", count)
-

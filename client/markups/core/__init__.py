@@ -1,4 +1,4 @@
-from typing import List, Self, Union
+from typing import List, Self
 
 from aiogram.types import InputMediaPhoto
 from aiogram.utils.formatting import as_list, Text, Bold, Italic
@@ -19,10 +19,8 @@ class InitializeMarkupInterface(ABC):
         self.text_message_markup = TextMessageMarkup(state)
 
 
-class InitializeApiMarkupInterface(InitializeMarkupInterface):
-    def __init__(self, state: State | None = None):
-        super().__init__(state)
-        self._api = Api()
+class AsyncInitializeMarkupInterface(InitializeMarkupInterface):
+    _api = Api
 
     @abstractmethod
     async def init(self):

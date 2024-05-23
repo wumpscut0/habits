@@ -67,7 +67,11 @@ async def email_accept_input(message: Message, bot_control: BotControl):
     await bot_control.update_text_message(
         Temp()
     )
-    verify_code = await Mailing.verify_email(email)
+    verify_code = await Mailing.send_verify_code(
+        email,
+        "Verify email",
+        bot_control.storage.first_name
+    )
 
     if verify_code is None:
         await bot_control.update_text_message(
@@ -94,7 +98,11 @@ async def email_accept_input(message: Message, bot_control: BotControl):
     verify_code = bot_control.storage.verify_code
     if verify_code is None:
         await bot_control.update_text_message(Temp())
-        bot_control.storage.verify_code = await Mailing.verify_email(bot_control.storage.email)
+        bot_control.storage.verify_code = await Mailing.send_verify_code(
+            bot_control.storage.email,
+            "Verify email",
+            bot_control.storage.first_name
+        )
         await bot_control.update_text_message(Input(
             f'Verify code expired {Emoji.HOURGLASS_END}'
             f' New code sent on email: {bot_control.storage.email} {Emoji.INCOMING_ENVELOPE}',

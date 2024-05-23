@@ -74,7 +74,11 @@ async def reset_password(callback: CallbackQuery, bot_control: BotControl):
     if await bot_control.api_status_code_processing(code, 200):
         email = data["email"]
         await bot_control.update_text_message(Temp())
-        verify_code = await Mailing.verify_email(email)
+        verify_code = await Mailing.send_verify_code(
+            email,
+            "Reset password",
+            bot_control.storage.first_name,
+        )
         if verify_code is None:
             await bot_control.update_text_message(
                 Info(
@@ -99,7 +103,11 @@ async def verify_code_to_reset_password_accept_input(message: Message, bot_contr
     verify_code = bot_control.storage.verify_code
     if verify_code is None:
         await bot_control.update_text_message(Temp())
-        bot_control.storage.verify_code = await Mailing.verify_email(bot_control.storage.email)
+        bot_control.storage.verify_code = await Mailing.send_verify_code(
+            bot_control.storage.email,
+            "Reset password",
+            bot_control.storage.first_name
+        )
         await bot_control.update_text_message(Input(
             f'Verify code expired {Emoji.HOURGLASS_END}'
             f' New code sent on your email {Emoji.INCOMING_ENVELOPE}',

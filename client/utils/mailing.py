@@ -20,12 +20,21 @@ class Mailing:
         return ''.join((secrets.choice(digits) for _ in range(6)))
 
     @classmethod
-    async def verify_email(cls, receiver: str):
+    async def send_verify_code(
+            cls,
+            receiver: str,
+            subject: str = "Verify",
+            name: str = "",
+    ):
         verify_code = await cls._generate_secret_key()
-        message = MIMEText(f'Your verify code: {verify_code}')
+        message = "Psychological service.\n"
+        if name:
+            message += f"Hello, {name}\n"
+        message += f"Your verify code: {verify_code}"
+        message = MIMEText(message)
         message['To'] = receiver
         message['From'] = MAIL_ADDRESS
-        message['Subject'] = 'Verify email'
+        message['Subject'] = subject
         async with aiosmtplib.SMTP(
                 hostname=SMTP_SERVER,
                 username=MAIL_ADDRESS,

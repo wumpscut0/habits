@@ -6,12 +6,22 @@ from redis import Redis
 from redis.commands.core import ResponseT
 from redis.typing import KeyT, ExpiryT, AbsExpiryT
 
-from client.markups import InitializeMarkupInterface
 from client.utils import config
 
 VERIFY_CODE_EXPIRATION = config.getint("limitations", "VERIFY_CODE_EXPIRATION")
 PASSWORD_EXPIRATION = config.getint("limitations", "PASSWORD_EXPIRATION")
 EMAIL_EXPIRATION = config.getint("limitations", "EMAIL_EXPIRATION")
+
+
+# Plan B for serialize/deserialize:
+
+# class SerializableMixin:
+#     async def serialize(self):
+#         return b64encode(pickle.dumps(self)).decode()
+#
+#
+# async def deserialize(sequence: str):
+#     return pickle.loads(b64decode(sequence.encode()))
 
 
 class CustomRedis(Redis):
@@ -56,32 +66,10 @@ class CustomRedis(Redis):
             return pickle.loads(result)
 
 
-class HourGlassAnimationIdsPull:
-    storage = CustomRedis(host=os.getenv("REDIS_HOST"), port=int(os.getenv("REDIS_PORT")), db=1)
-
-    @property
-    def pull(self):
-        return self.storage.get(f"hour_glass_animation_pull")
-
-    def add_id(self, animation_id: str):
-        pull = self.pull
-        pull.add(animation_id)
-        self.pull = pull
-
-    def remove_id(self, animation_id: str):
-        pull = self.pull
-        pull.add(animation_id)
-        self.pull = pull
-
-    @pull.setter
-    def pull(self, data: set[str]):
-        self.storage.set(f"hour_glass_animation_pull", data)
-
-
 class Storage:
     storage = CustomRedis(host=os.getenv("REDIS_HOST"), port=int(os.getenv("REDIS_PORT")), db=1)
 
-    def __init__(self, user_id=None):
+    def __init__(self, user_id):
         self.user_id = user_id
 
     @property

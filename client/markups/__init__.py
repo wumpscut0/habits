@@ -1,7 +1,7 @@
 from aiogram.filters.callback_data import CallbackData
 
 from client.bot.FSM import States
-from client.markups.core import TextMessageMarkup, ButtonWidget, TextWidget, InitializeMarkupInterface
+from client.markups.core import TextMessageMarkup, ButtonWidget, TextWidget, InitializeMarkupInterface, DataTextWidget
 from client.utils import Emoji
 
 
@@ -99,3 +99,29 @@ class Conform(InitializeMarkupInterface):
         self.no = ButtonWidget(mark=no_mark, text=no_text, callback_data=no_callback_data)
         self.text_message_markup.add_text_row(TextWidget(text=info))
         self.text_message_markup.add_buttons_in_new_row(self.yes, self.no)
+
+
+class ProgressWidget(InitializeMarkupInterface):
+    def __init__(
+            self,
+            divisible: int,
+            divider: int,
+            *,
+            length_widget: int = 10,
+            header: str = "Progress",
+            show_digits: bool = True
+    ):
+        super().__init__()
+        progress = DataTextWidget(text=header)
+        if divisible > divider:
+            fraction = 10
+            progress.data = Emoji.GREEN_BIG_SQUARE * length_widget
+        else:
+            fraction = divisible / divider * length_widget
+            grey_progress = (length_widget - fraction) * Emoji.GREY_BUG_SQUARE
+            green_progress = fraction * Emoji.GREEN_BIG_SQUARE
+            progress.data = green_progress + grey_progress
+
+        if show_digits:
+            progress.data = f"{progress.data} {fraction * 10}%"
+        self.text_message_markup.add_text_row(progress)

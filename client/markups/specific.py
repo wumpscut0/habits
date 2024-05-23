@@ -5,12 +5,12 @@ from aiogram.filters.callback_data import CallbackData
 from zxcvbn import zxcvbn
 
 from client.bot.FSM import States
-from client.markups import InitializeMarkupInterface, Back, Conform, Input
-from client.markups.core import TextWidget, ButtonWidget, DataTextWidget, InitializeApiMarkupInterface
+from client.markups import InitializeMarkupInterface, Back, Conform, Input, ProgressWidget
+from client.markups.core import TextWidget, ButtonWidget, DataTextWidget, AsyncInitializeMarkupInterface
 from client.utils import Emoji
 
 
-class TitleScreen(InitializeApiMarkupInterface):
+class TitleScreen(AsyncInitializeMarkupInterface):
     def __init__(self, user_id: str):
         self._user_id = user_id
         super().__init__()
@@ -40,7 +40,7 @@ class TitleScreen(InitializeApiMarkupInterface):
         return notifications_button
 
 
-class AuthenticationWithPassword(InitializeApiMarkupInterface):
+class AuthenticationWithPassword(AsyncInitializeMarkupInterface):
     def __init__(self, user_id: str, text=f'{Emoji.KEY} Enter the password'):
         self._user_id = user_id
         self._input = Input(text)
@@ -121,7 +121,7 @@ class Profile(InitializeMarkupInterface):
         ]
 
 
-class Options(InitializeApiMarkupInterface):
+class Options(AsyncInitializeMarkupInterface):
     def __init__(self, user_id: str):
         super().__init__()
         self._user_id = user_id
@@ -195,3 +195,73 @@ class ChangeNotificationsMinute(InitializeMarkupInterface):
         self.text_message_markup.add_text_row(self._info)
         self.text_message_markup.add_buttons_in_last_row(*self._minutes)
         self.text_message_markup.attach(Back(text=F"{Emoji.DENIAL} Cancel"))
+
+
+# import re
+#
+# from aiogram.filters.callback_data import CallbackData
+#
+# from client.bot.FSM import States
+# from client.markups import ProgressWidget
+# from client.markups.core import TextMarkup, DataTextWidget, KeyboardMarkup, ButtonWidget, TextWidget, \
+#     AsyncInitializeMarkupInterface
+#
+# from client.utils import config, Emoji
+
+# MAX_EMAIL_LENGTH = config.getint('limitations', 'MAX_EMAIL_LENGTH')
+# MAX_NAME_LENGTH = config.getint('limitations', 'MAX_NAME_LENGTH')
+# MAX_DESCRIPTION_LENGTH = config.getint('limitations', 'MAX_DESCRIPTION_LENGTH')
+# MAX_PASSWORD_LENGTH = config.getint('limitations', "MAX_PASSWORD_LENGTH")
+# MIN_BORDER_RANGE = config.getint('limitations', "MIN_BORDER_RANGE")
+# MAX_BORDER_RANGE = config.getint('limitations', "MAX_BORDER_RANGE")
+# STANDARD_BORDER_RANGE = config.getint('limitations', "STANDARD_BORDER_RANGE")
+#
+#
+# class ShowTargetCallbackData(CallbackData, prefix='show_target'):
+#     id: int
+
+
+class TargetsControl(AsyncInitializeMarkupInterface):
+    def __init__(self, token: str):
+        super().__init__()
+        self._token = token
+
+    async def init(self):
+        targets, code = await self._api.get_targets(self._token)
+        if code == 200:
+            if targets:
+                total_current_targets_completed = sum(
+                    (1 for target in targets if target["completed"] and target["progress"] != target["border_progress"])
+                )
+                total_targets_uncompleted = sum(
+                    (1 for target in targets if
+                     not target["completed"] and target["progress"] != target["border_progress"])
+                )
+                progress = ProgressWidget(
+                    total_current_targets_completed,
+                    total_targets_uncompleted,
+                    header="Progress today"
+                )
+                self.text_message_markup.attach(progress)
+            else:
+                progress = TextWidget(text=f"No targets so far {Emoji.CRYING_CAT}")
+                self.text_message_markup.add_text_row(progress)
+        else:
+            progress = TextWidget(text=f"{Emoji.DENIAL} Error")
+            self.text_message_markup.add_text_row(progress)
+
+        self.text_message_markup.keyboard_map = [
+            [
+                ButtonWidget(text=f"{Emoji.DIAGRAM} Manage targets", callback_data="manage_targets"),
+            ],
+            [
+                ButtonWidget(text=f"{Emoji.SPROUT} Create target", callback_data="create_target"),
+            ],
+            [
+                ButtonWidget(text=f"{Emoji.TROPHY} Achievements", callback_data="manage_targets"),
+            ],
+            [
+                ButtonWidget(text=f"{Emoji.BACK} Back", callback_data="profile")
+            ]
+        ]
+        return self

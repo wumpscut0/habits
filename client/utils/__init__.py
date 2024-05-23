@@ -65,20 +65,6 @@ class Emoji:
     WATCH = "⌚️"
 
 
-class SerializableMixin:
-    async def serialize(self):
-        return b64encode(pickle.dumps(self)).decode()
-
-
-async def deserialize(sequence: str):
-    return pickle.loads(b64decode(sequence.encode()))
-
-
 config = ConfigParser()
 
 config.read(os.path.abspath(os.path.join(os.path.dirname(__file__), "config.ini")))
-
-
-
-
-

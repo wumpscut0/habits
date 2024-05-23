@@ -8,152 +8,195 @@ class Api:
     _cipher = Fernet(os.getenv("CIPHER"))
     _address = os.getenv("BACKEND")
 
-    def __init__(self):
-        self._headers = {
+    @classmethod
+    def _headers(cls):
+        return {
             "Authorization": '',
             "x-service-name": "Psychological",
             "api-key": os.getenv("API_KEY")
         }
-
-    async def add_user(self, user_id: str):
-        async with ClientSession(self._address) as session:
+    
+    @classmethod
+    async def add_user(cls, user_id: str):
+        async with ClientSession(cls._address) as session:
             async with session.post(
                     '/users', json={'user_id': user_id},
-                    headers=self._headers
+                    headers=cls._headers()
             ) as response:
                 return await response.json(), response.status
 
-    async def get_user(self, user_id: str):
-        async with ClientSession(self._address) as session:
+    @classmethod
+    async def get_user(cls, user_id: str):
+        async with ClientSession(cls._address) as session:
             async with session.get(
-                    f'/users/{self._cipher.encrypt(str(user_id).encode()).decode()}',
-                    headers=self._headers
+                    f'/users/{cls._cipher.encrypt(str(user_id).encode()).decode()}',
+                    headers=cls._headers()
             ) as response:
                 return await response.json(), response.status
 
-    async def authentication(self, user_id: str, password: str | None = None):
-        async with ClientSession(self._address) as session:
+    @classmethod
+    async def authentication(cls, user_id: str, password: str | None = None):
+        async with ClientSession(cls._address) as session:
             async with session.post('/users/login', json={
                     'user_id': user_id,
                     "password": password,
-            }, headers=self._headers) as response:
+            }, headers=cls._headers()) as response:
                 return await response.json(), response.status
 
-    async def get_targets(self, token: str):
-        self._headers["Authorization"] = f"Bearer {token}"
-        async with ClientSession(self._address) as session:
+    @classmethod
+    async def get_targets(cls, token: str):
+        headers = cls._headers()
+        headers["Authorization"] = f"Bearer {token}"
+        async with ClientSession(cls._address) as session:
             async with session.get(
                     f'/targets',
-                    headers=self._headers
+                    headers=headers
             ) as response:
                 return await response.json(), response.status
 
-    async def invert_notifications(self, user_id: str):
-        async with ClientSession(self._address) as session:
+    @classmethod
+    async def invert_notifications(cls, user_id: str):
+        async with ClientSession(cls._address) as session:
             async with session.patch(
                     "/users/notifications",
                     json={"user_id": user_id},
-                    headers=self._headers
+                    headers=cls._headers()
             ) as response:
                 return await response.json(), response.status
 
-    async def increase_progress(self):
-        async with ClientSession(self._address) as session:
+    @classmethod
+    async def increase_progress(cls):
+        async with ClientSession(cls._address) as session:
             async with session.patch(
                     f'/targets/progress',
-                    headers=self._headers
+                    headers=cls._headers()
             ) as response:
                 return await response.json(), response.status
 
-    async def get_users(self):
-        async with ClientSession(self._address) as session:
+    @classmethod
+    async def get_users(cls):
+        async with ClientSession(cls._address) as session:
             async with session.get(
                     f'/users',
-                    headers=self._headers
+                    headers=cls._headers()
             ) as response:
                 return await response.json(), response.status
 
-    async def update_password(self, user_id: str, hash_: str):
-        async with ClientSession(self._address) as session:
+    @classmethod
+    async def update_password(cls, user_id: str, hash_: str):
+        async with ClientSession(cls._address) as session:
             async with session.put(
                 f"/users/password",
                 json={
                     "user_id": user_id,
                     "hash": hash_,
                 },
-                headers=self._headers
+                headers=cls._headers()
             ) as response:
                 return await response.json(), response.status
 
-    async def delete_password(self, token: str):
-        self._headers["Authorization"] = f"Bearer {token}"
-        async with ClientSession(self._address) as session:
+    @classmethod
+    async def delete_password(cls, token: str):
+        headers = cls._headers()
+        headers["Authorization"] = f"Bearer {token}"
+        async with ClientSession(cls._address) as session:
             async with session.delete(
                     f"/users/password",
-                    headers=self._headers
+                    headers=headers
             ) as response:
                 return await response.json(), response.status
 
-    async def update_email(self, token: str, email: str):
-        self._headers["Authorization"] = f"Bearer {token}"
-        async with ClientSession(self._address) as session:
+    @classmethod
+    async def update_email(cls, token: str, email: str):
+        headers = cls._headers()
+        headers["Authorization"] = f"Bearer {token}"
+        async with ClientSession(cls._address) as session:
             async with session.put(
                 f"/users/email",
                 json={"email": email},
-                headers=self._headers
+                headers=headers
             ) as response:
                 return await response.json(), response.status
 
-    async def delete_email(self, token: str):
-        self._headers["Authorization"] = f"Bearer {token}"
-        async with ClientSession(self._address) as session:
+    @classmethod
+    async def delete_email(cls, token: str):
+        headers = cls._headers()
+        headers["Authorization"] = f"Bearer {token}"
+        async with ClientSession(cls._address) as session:
             async with session.delete(
                     f"/users/email",
-                    headers=self._headers
+                    headers=headers
             ) as response:
                 return await response.json(), response.status
 
-    async def update_notifications_time(self, token: str, hour: int, minute: int):
-        self._headers["Authorization"] = f"Bearer {token}"
-        async with ClientSession(self._address) as session:
+    @classmethod
+    async def update_notifications_time(cls, token: str, hour: int, minute: int):
+        headers = cls._headers()
+        headers["Authorization"] = f"Bearer {token}"
+        async with ClientSession(cls._address) as session:
             async with session.put(
                     "/users/notifications",
                     json={"hour": hour, "minute": minute},
-                    headers=self._headers
+                    headers=headers
             ) as response:
                 return await response.json(), response.status
 
-    async with self._interface.session.post('/targets', json={
-    #             "name": name,
-    #             "border_progress": border
-    #         }, headers={"Authorization": self._interface.token}) as response:
+    @classmethod
+    async def create_target(cls, token: str, name: str, border_progress: int, description: str | None = None):
+        headers = cls._headers()
+        headers["Authorization"] = f"Bearer {token}"
+        async with ClientSession(cls._address) as session:
+            async with session.post('/targets', json={
+                "name": name,
+                "border_progress": border_progress,
+                "descriptions": description
+            }, headers=headers) as response:
+                return await response.json(), response.status
 
-    async with self._interface.session.delete(
-    #             f'/targets/{storage.get(f"target_id:{self._interface._user_id}")}',
-    #             headers={"Authorization": self._interface.token}
-    #         ) as response:
+    @classmethod
+    async def delete_target(cls, token: str, target_id: int):
+        headers = cls._headers()
+        headers["Authorization"] = f"Bearer {token}"
+        async with ClientSession(cls._address) as session:
+            async with session.delete(
+                f'/targets/{target_id}',
+                headers=headers
+            ) as response:
+                return await response.json(), response.status
 
-    #         async with (self._interface.session.get(f"/targets/{kwargs['target_id']}", headers={"Authorization": self._interface.token}) as response):
+    @classmethod
+    async def get_target(cls, token: str, target_id: int):
+        headers = cls._headers()
+        headers["Authorization"] = f"Bearer {token}"
+        async with ClientSession(cls._address) as session:
+            async with session.get(
+                    f"/targets/{target_id}",
+                    headers=headers
+            ) as response:
+                return await response.json(), response.status
 
-    #         async with self._interface.session.patch(f'/targets/{target_id}/invert', headers={"Authorization": self._interface.token}) as response:
+    @classmethod
+    async def mark_target_as_complete(cls, token: str, target_id: int):
+        headers = cls._headers()
+        headers["Authorization"] = f"Bearer {token}"
+        async with ClientSession(cls._address) as session:
+            async with session.patch(
+                    f'/targets/{target_id}/invert',
+                    headers=headers
+            ) as response:
+                return await response.json(), response.status
 
-    async with self._interface.session.patch(
-    #                 f'/target/{target_id}', json={"name": name},
-    #                 headers={"Authorization": self._interface.token}
-    #             ) as response:
-    #                 response = await self._interface.response_middleware(response)
-    #                 if response is not None:
-    #                     await self._interface.targets_manager.target.open(target_id=target_id)
-
-    async with self._interface.session.patch(
-    #                     f'/target/{target_id}', json={"name": description},
-    #                     headers={"Authorization": self._interface.token}
-    #             ) as response:
-    #                 response = await self._interface.response_middleware(response)
-    #                 if response is not None:
-    #                     await self._interface.targets_manager.target.open(target_id=target_id)
-
-    async with self._interface.session.get(
-    #                 f"/target/{kwargs['target_id']}",
-    #                 headers={"Authorization": self._interface._user_id}
-    #         ) as response:
+    @classmethod
+    async def update_target(cls, token: str, target_id: int, name: str | None = None, description: str | None = None):
+        headers = cls._headers()
+        headers["Authorization"] = f"Bearer {token}"
+        async with ClientSession(cls._address) as session:
+            async with session.patch(
+                    f'/targets/{target_id}',
+                    json={
+                        "name": name,
+                        "description": description
+                    },
+                    headers=headers
+            ) as response:
+                return await response.json(), response.status

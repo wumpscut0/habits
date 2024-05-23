@@ -8,7 +8,7 @@ from aiogram.types import BotCommand
 
 from client.api import Api
 from client.markups import Info, InitializeMarkupInterface
-from client.markups.core import TextMessageMarkup, InitializeApiMarkupInterface
+from client.markups.core import TextMessageMarkup, AsyncInitializeMarkupInterface
 from client.markups.specific import TitleScreen
 from client.utils import Emoji
 from client.utils.loggers import errors, info
@@ -46,9 +46,9 @@ class BotCommands:
 
 class BotControl:
     bot = Bot(os.getenv('TOKEN'), parse_mode='HTML')
+    api = Api
 
     def __init__(self, user_id: int, state: FSMContext | None = None, contextualize: bool = True):
-        self.api = Api()
         self._user_id = user_id
         self._state = state
         self.storage = Storage(user_id)
@@ -74,7 +74,7 @@ class BotControl:
             self,
             text_message_markup: TextMessageMarkup | InitializeMarkupInterface
     ):
-        if isinstance(text_message_markup, (InitializeMarkupInterface, InitializeApiMarkupInterface)):
+        if isinstance(text_message_markup, (InitializeMarkupInterface, AsyncInitializeMarkupInterface)):
             text_message_markup = text_message_markup.text_message_markup
 
         # if self.contextualize:
@@ -99,7 +99,7 @@ class BotControl:
             self,
             text_message_markup: TextMessageMarkup | InitializeMarkupInterface,
     ):
-        if isinstance(text_message_markup, (InitializeMarkupInterface, InitializeApiMarkupInterface)):
+        if isinstance(text_message_markup, (InitializeMarkupInterface, AsyncInitializeMarkupInterface)):
             text_message_markup = text_message_markup.text_message_markup
 
         if self.contextualize:
@@ -132,7 +132,7 @@ class BotControl:
             initializer, args, kwargs = self.storage.context
             if InitializeMarkupInterface in initializer.__bases__:
                 await self.update_text_message(initializer(*args, **kwargs))
-            elif InitializeApiMarkupInterface in initializer.__bases__:
+            elif AsyncInitializeMarkupInterface in initializer.__bases__:
                 await self.update_text_message(await initializer(*args, **kwargs).init())
             else:
                 errors.critical(f"Incorrect initializer in context.\n"
