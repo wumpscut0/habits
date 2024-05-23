@@ -145,8 +145,7 @@ class BotControl:
             errors.error(f"broken contex {e}")
             self.set_context(TitleScreen, self._user_id)
             await self.update_text_message(
-                Info(f"Application updated {Emoji.UP}\n"
-                     f"Please sign in again {Emoji.DOOR}")
+                Info(f"Something happened {Emoji.CRYING_CAT} Sorry")
             )
 
     async def send_message_to_admin(self, message: str):

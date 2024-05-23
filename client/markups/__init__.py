@@ -28,7 +28,7 @@ class Back(InitializeMarkupInterface):
         self.text_message_markup.add_button_in_new_row(self.back)
 
 
-class Pagination(InitializeMarkupInterface):
+class LeftRight(InitializeMarkupInterface):
     def __init__(
         self,
         left_callback_data: str | CallbackData,
@@ -46,23 +46,24 @@ class Pagination(InitializeMarkupInterface):
 class LeftBackRight(InitializeMarkupInterface):
     def __init__(
         self,
-        back_callback_data: str | CallbackData,
         left_callback_data: str | CallbackData,
         right_callback_data: str | CallbackData,
+        back_text: str = f"{Emoji.BACK} Back",
+        back_callback_data: str | CallbackData = "return_to_context",
         left_mark: str = "",
         right_mark: str = ""
     ):
         super().__init__()
-        pagination = Pagination(
+        left_right = LeftRight(
             left_callback_data=left_callback_data,
             right_callback_data=right_callback_data,
             left_mark=left_mark,
             right_mark=right_mark
         )
         self.text_message_markup.add_buttons_in_new_row(
-            pagination.left,
-            Back(callback_data=back_callback_data).back,
-            pagination.right,
+            left_right.left,
+            Back(text=back_text, callback_data=back_callback_data).back,
+            left_right.right,
         )
 
 
@@ -101,27 +102,7 @@ class Conform(InitializeMarkupInterface):
         self.text_message_markup.add_buttons_in_new_row(self.yes, self.no)
 
 
-class ProgressWidget(InitializeMarkupInterface):
-    def __init__(
-            self,
-            divisible: int,
-            divider: int,
-            *,
-            length_widget: int = 10,
-            header: str = "Progress",
-            show_digits: bool = True
-    ):
+class ErrorInfo(InitializeMarkupInterface):
+    def __init__(self, text=f"Error during data loading {Emoji.CRYING_CAT + Emoji.BROKEN_HEARTH} Sorry"):
         super().__init__()
-        progress = DataTextWidget(text=header)
-        if divisible > divider:
-            fraction = 10
-            progress.data = Emoji.GREEN_BIG_SQUARE * length_widget
-        else:
-            fraction = divisible / divider * length_widget
-            grey_progress = (length_widget - fraction) * Emoji.GREY_BUG_SQUARE
-            green_progress = fraction * Emoji.GREEN_BIG_SQUARE
-            progress.data = green_progress + grey_progress
-
-        if show_digits:
-            progress.data = f"{progress.data} {fraction * 10}%"
-        self.text_message_markup.add_text_row(progress)
+        self.text_message_markup.attach(Info(text))

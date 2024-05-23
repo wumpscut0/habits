@@ -11,14 +11,8 @@ from client.markups.specific import TitleScreen, AuthenticationWithPassword, Pro
 from client.utils import Emoji, config
 from client.utils.mailing import Mailing
 
-MAX_EMAIL_LENGTH = config.getint('limitations', 'MAX_EMAIL_LENGTH')
-MAX_NAME_LENGTH = config.getint('limitations', 'MAX_NAME_LENGTH')
-MAX_DESCRIPTION_LENGTH = config.getint('limitations', 'MAX_DESCRIPTION_LENGTH')
+
 MAX_PASSWORD_LENGTH = config.getint('limitations', "MAX_PASSWORD_LENGTH")
-MIN_BORDER_RANGE = config.getint('limitations', "MIN_BORDER_RANGE")
-MAX_BORDER_RANGE = config.getint('limitations', "MAX_BORDER_RANGE")
-STANDARD_BORDER_RANGE = config.getint('limitations', "STANDARD_BORDER_RANGE")
-VERIFY_CODE_EXPIRATION = config.getint("limitations", "VERIFY_CODE_EXPIRATION")
 
 basic_router = Router()
 

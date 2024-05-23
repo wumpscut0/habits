@@ -112,11 +112,11 @@ class TargetsQueries:
         target = await session.get(TargetORM, ident=target_id)
         if target is None:
             raise HTTPException(404)
-        return target.as_dict_
+        return target.as_dict_()
 
     @staticmethod
     async def update(session: AsyncSession, target_id: int, **kwargs):
-        kwargs = {k: v for k, v in kwargs if v is not None}
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
         await session.execute(
             update(TargetORM)
             .values(kwargs)

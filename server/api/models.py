@@ -155,7 +155,7 @@ class TargetDescriptionApiModel(AsyncValidationModelMixin, BaseModel):
 
 
 class TargetApiModel(AsyncValidationModelMixin, BaseModel):
-    name: TargetNameApiModel
+    name: str
     border_progress: int | None = None
     description: str | None = None
 

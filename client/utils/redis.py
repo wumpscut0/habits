@@ -166,3 +166,27 @@ class Storage:
     @hash.setter
     def hash(self, data: Any):
         self.storage.set(f"hash:{self.user_id}", data)
+
+    @property
+    def target_id(self):
+        return self.storage.get(f"target_id:{self.user_id}")
+
+    @target_id.setter
+    def target_id(self, data: Any):
+        self.storage.set(f"target_id:{self.user_id}", data)
+
+    @property
+    def target_name(self):
+        return self.storage.get(f"target_name:{self.user_id}")
+
+    @target_name.setter
+    def target_name(self, data: Any):
+        self.storage.set(f"target_name:{self.user_id}", data)
+
+    @property
+    def target_description(self):
+        return self.storage.get(f"target_description:{self.user_id}")
+
+    @target_description.setter
+    def target_description(self, data: Any):
+        self.storage.set(f"target_description:{self.user_id}", data)

@@ -32,7 +32,7 @@ async def create_target(
         payload: Annotated[Payload, Depends(Authority.user_authorization)]
 ):
     async with Session.begin() as session:
-        await TargetsQueries.create(session, payload.sub, **target_api_model.model_dump())
+        await TargetsQueries.create(session, payload["sub"], **target_api_model.model_dump())
 
 
 @targets_router.put('/{target_id}', dependencies=[Depends(Authority.user_authorization)])
@@ -42,7 +42,7 @@ async def update_target_name(
 ):
     async with Session.begin() as session:
         await TargetsQueries.get_target(session, target_id)
-        await TargetsQueries.update(session, **update_target_api_model.model_dump())
+        await TargetsQueries.update(session, target_id, **update_target_api_model.model_dump())
 
 
 @targets_router.delete('/{target_id}', dependencies=[Depends(Authority.user_authorization)])

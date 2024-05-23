@@ -149,7 +149,7 @@ class Api:
             async with session.post('/targets', json={
                 "name": name,
                 "border_progress": border_progress,
-                "descriptions": description
+                "description": description
             }, headers=headers) as response:
                 return await response.json(), response.status
 
@@ -176,7 +176,7 @@ class Api:
                 return await response.json(), response.status
 
     @classmethod
-    async def mark_target_as_complete(cls, token: str, target_id: int):
+    async def invert_completed(cls, token: str, target_id: int):
         headers = cls._headers()
         headers["Authorization"] = f"Bearer {token}"
         async with ClientSession(cls._address) as session:
@@ -187,11 +187,11 @@ class Api:
                 return await response.json(), response.status
 
     @classmethod
-    async def update_target(cls, token: str, target_id: int, name: str | None = None, description: str | None = None):
+    async def update_target(cls, token: str, target_id: int, *, name: str | None = None, description: str | None = None):
         headers = cls._headers()
         headers["Authorization"] = f"Bearer {token}"
         async with ClientSession(cls._address) as session:
-            async with session.patch(
+            async with session.put(
                     f'/targets/{target_id}',
                     json={
                         "name": name,

@@ -1,3 +1,4 @@
+import math
 import os
 import pickle
 from base64 import b64decode, b64encode
@@ -68,3 +69,26 @@ class Emoji:
 config = ConfigParser()
 
 config.read(os.path.abspath(os.path.join(os.path.dirname(__file__), "config.ini")))
+
+
+def create_progress_text(
+        divisible: int,
+        divider: int,
+        *,
+        length_widget: int = 10,
+        show_digits: bool = True
+):
+    if divisible > divider:
+        percent = 100
+        progress = Emoji.GREEN_BIG_SQUARE * length_widget
+    else:
+        float_fraction = divisible / divider * length_widget
+        percent = math.ceil(float_fraction * 10)
+        fraction = math.ceil(float_fraction)
+        grey_progress = (length_widget - fraction) * Emoji.GREY_BUG_SQUARE
+        green_progress = fraction * Emoji.GREEN_BIG_SQUARE
+        progress = green_progress + grey_progress
+
+    if show_digits:
+        return f"{progress} {percent}%"
+    return progress

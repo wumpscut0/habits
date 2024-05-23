@@ -8,9 +8,13 @@ from apscheduler.triggers.cron import CronTrigger
 from client.api import Api
 from client.bot import BotControl
 from client.markups import Info
+from client.utils import config, Emoji
 
 from client.utils.loggers import info, errors
 from client.utils.redis import Storage, CustomRedis
+
+MINUTE_INCREASE_PROGRESS = config.getint("limitations", "MINUTE_INCREASE_PROGRESS")
+HOUR_INCREASE_PROGRESS = config.getint("limitations", "HOUR_INCREASE_PROGRESS")
 
 
 class Scheduler:
@@ -28,7 +32,7 @@ class Scheduler:
     _api = Api
 
     @classmethod
-    def set_job_increase_progress(cls, hour=0, minute=0):
+    def set_job_increase_progress(cls, hour=HOUR_INCREASE_PROGRESS, minute=MINUTE_INCREASE_PROGRESS):
         cls.scheduler.add_job(
             Workers.increase_progress,
             'cron',
@@ -76,14 +80,21 @@ class Workers:
 
     @staticmethod
     async def remainder(user_id: int):
-        await BotControl(user_id).create_text_message(Info('Don`t forget mark done target today'))
+        await BotControl(user_id).create_text_message(Info(f'Don`t forget mark done targets today {Emoji.SPROUT}'))
         info.info(f'Remaining sent to user {user_id}')
 
     @classmethod
     async def increase_progress(cls):
         _, code = await cls._api.increase_progress()
+
         if code == 200:
             info.info(f'Progress increased')
+            users, code = await cls._api.get_users()
+            if code == 200:
+                for user in users:
+                    await Scheduler.refresh_notifications(user["id"])
+                info.info("Refreshed notifications for all users")
+            errors.critical("Refreshed notifications for all users failed")
         else:
             errors.critical(f"Progress not increased. Status: {code}")
             storage = CustomRedis(host=os.getenv("REDIS_HOST"), port=int(os.getenv("REDIS_PORT")), db=1)
@@ -92,3 +103,5 @@ class Workers:
                 count = 0
             count += 1
             storage.set(f"not_increase_count", count)
+
+
