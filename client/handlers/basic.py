@@ -40,8 +40,11 @@ async def authorization(callback: CallbackQuery, bot_control: BotControl):
             data, code = await bot_control.api.authentication(bot_control.user_id)
             if await bot_control.api_status_code_processing(code, 200):
                 bot_control.storage.user_token = data["access_token"]
-                bot_control.set_context(Profile, bot_control.storage.first_name)
-                await bot_control.update_text_message(Profile(bot_control.storage.first_name))
+                bot_control.set_context(Profile, bot_control.storage.user_token, bot_control.storage.first_name)
+                await bot_control.update_text_message(await Profile(
+                    bot_control.storage.user_token,
+                    bot_control.storage.first_name
+                ).init())
 
 
 @basic_router.message(StateFilter(States.input_text_sign_in_with_password), F.text)
@@ -54,7 +57,10 @@ async def password_accept_input(message: Message, bot_control: BotControl):
         if code == 200:
             bot_control.storage.user_token = data["access_token"]
             bot_control.set_context(Profile, bot_control.storage.first_name)
-            await bot_control.update_text_message(Profile(bot_control.storage.first_name))
+            await bot_control.update_text_message(await Profile(
+                bot_control.storage.user_token,
+                bot_control.storage.first_name
+            ).init())
         elif code == 401:
             await bot_control.update_text_message(await AuthenticationWithPassword(
                 bot_control.user_id,

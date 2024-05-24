@@ -45,7 +45,7 @@ class TargetORM(Base):
     __tablename__ = 'target'
     id = Column(Integer, primary_key=True)
     create_datetime = Column(DateTime, default=datetime.now())
-    completed_datetime = Column(DateTime)
+    completed_datetime = Column(DateTime, default=None)
 
     name = Column(VARCHAR(MAX_NAME_LENGTH), nullable=False)
     description = Column(VARCHAR(MAX_DESCRIPTION_LENGTH))

@@ -14,7 +14,6 @@ from client.utils import Emoji
 
 
 class InitializeMarkupInterface(ABC):
-
     def __init__(self, state: State | None = None):
         self.text_message_markup = TextMessageMarkup(state)
 
@@ -34,28 +33,32 @@ class AsyncInitializeMarkupInterface(InitializeMarkupInterface):
 
 class TextWidget:
     def __init__(
-            self,
-            *,
-            mark: str = '',
-            text: str = None,
-
+        self,
+        *,
+        mark: str = '',
+        text: str = Emoji.BAN,
+        mark_left: bool = True,
+        sep: str = ' '
     ):
         self.mark = mark
         self._text = text
+        self.mark_left = mark_left
+        self.sep = sep
 
     def __repr__(self):
-        return self._text
+        return self.text
 
     @property
     def text(self):
-        if self._text is None:
-            return Text(Emoji.BAN)
-        separator = '' if str(self._text).startswith(' ') else ' '
-        return Text(self.mark) + Text(separator) + Bold(self._text)
+        if self.mark_left:
+            # separator = '' if str(self._text).startswith(self.separator) else self.separator
+            return Text(self.mark) + Text(self.sep) + Bold(self._text)
+        # separator = '' if str(self._text).endswith(self.separator) else self.separator
+        return Bold(self._text) + Text(self.sep) + Text(self.mark)
 
     @text.setter
-    def text(self, value):
-        self._text = value
+    def text(self, text: str):
+        self._text = text
 
 
 class DataTextWidget(TextWidget):
@@ -63,7 +66,7 @@ class DataTextWidget(TextWidget):
             self,
             *,
             mark: str = '',
-            text: str = None,
+            text: str = Emoji.BAN,
             data: str = Emoji.GREY_QUESTION,
             sep: str = ': ',
             end: str = '',
@@ -73,12 +76,12 @@ class DataTextWidget(TextWidget):
             text=text,
         )
         self.data = data
-        self.sep = sep
+        self.sep_ = sep
         self.end = end
 
     @property
     def text(self):
-        return super().text + Text(self.sep) + Italic(self.data) + Italic(self.end)
+        return super().text + Text(self.sep_) + Italic(self.data) + Italic(self.end)
 
 
 class ButtonWidget:
@@ -86,30 +89,29 @@ class ButtonWidget:
             self, *,
             mark: str = '',
             text: str = None,
-            callback_data: str | CallbackData = None
+            mark_left: bool = True,
+            sep: str = ' ',
+            callback_data: str | CallbackData = Emoji.BAN
     ):
         self.mark = mark
         self._text = text
-        self._callback_data = callback_data
+        self.mark_left = mark_left
+        self.sep = sep
+        self.callback_data = callback_data
+
+    def __repr__(self):
+        return self.text
 
     @property
     def text(self):
-        separator = '' if str(self._text).startswith(' ') else ' '
-        return self.mark + separator + self._text
+        # separator = '' if str(self._text).startswith(' ') else ' '
+        if self.mark_left:
+            return self.mark + self.sep + self._text
+        return self._text + self.sep + self.mark
 
     @text.setter
     def text(self, text: str):
         self._text = text
-
-    @property
-    def callback_data(self):
-        if not self._callback_data:
-            return Emoji.BAN
-        return self._callback_data
-
-    @callback_data.setter
-    def callback_data(self, callback_data):
-        self._callback_data = callback_data
 
 
 class TextMarkup:

@@ -6,16 +6,19 @@ from aiogram.types import CallbackQuery, Message
 
 from client.bot import BotControl
 from client.bot.FSM import States
-from client.handlers import MAX_EMAIL_LENGTH
+
 from client.markups import Input, Info, Temp
 from client.markups.specific import ChangeNotificationsHour, NotificationsHourCallbackData, ChangeNotificationsMinute, \
     NotificationsMinuteCallbackData
 
-from client.utils import Emoji
+from client.utils import Emoji, config
 from client.utils.mailing import Mailing
 from client.utils.scheduler import Scheduler
 
 options_router = Router()
+
+
+MAX_EMAIL_LENGTH = config.getint("limitations", "MAX_EMAIL_LENGTH")
 
 
 @options_router.callback_query(F.data == "input_password")

@@ -9,10 +9,13 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
 from server.database.models import Base
-from server.utils import config
+
 from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
 
+config = configparser.ConfigParser()
+
+config.read(os.path.abspath(os.path.join(os.path.dirname(__file__), "../alembic.ini")))
 
 config.set('alembic', 'sqlalchemy.url', os.getenv("DATABASE") + '/habits')
 

@@ -5,11 +5,16 @@ services:
     build:
       context: server
     ports:
-      - "8000:8000"
+      - "8000"
     networks:
       - bridge
     environment:
+      JWT: 9565157d0e36f3e9c1c334666899186f3d1aaa5b3fbee105412c4344cd83b1e8
+      CIPHER: 0hVakjHd7dL07Ndtb0wTcaJQPx2HwlAgpbIQzhW2rEU=
       DATABASE: postgresql+asyncpg://postgres:postgres@postgres:5432
+      API_KEY: my_api_key
+      UVICORN_IP: 0.0.0.0
+      UVICORN_PORT: 8000
   bot:
     ports:
       - "80:80"
@@ -19,15 +24,23 @@ services:
     build:
       context: client
     environment:
+      TOKEN: 6943554911:AAFbCJZH2U9K2zTBJ5EvDuiX1OYQ-Kkf-Oo
+      JWT: 9565157d0e36f3e9c1c334666899186f3d1aaa5b3fbee105412c4344cd83b1e8
+      SMTP_PASSWORD: my_smtp_password
+      ORGANIZATION_EMAIL: my_email
+      API_KEY: my_api_key
+      CIPHER: 0hVakjHd7dL07Ndtb0wTcaJQPx2HwlAgpbIQzhW2rEU=
+      GROUP_ID: my_group_id
       BACKEND: http://api:8000
       REDIS_HOST: redis
+      REDIS_PORT: 6379
     networks:
       - bridge
 
   postgres:
     image: postgres
     ports:
-      - "5432:5432"
+      - "5432"
     environment:
       POSTGRES_DB: habits
       POSTGRES_PASSWORD: postgres
@@ -39,9 +52,9 @@ services:
   redis:
     image: redis
     ports:
-      - "6379:6379"
+      - "6379"
     volumes:
-      - redis_data:/data
+      - redis_data:/var/lib/redis
     networks:
       - bridge
 

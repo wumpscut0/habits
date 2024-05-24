@@ -21,9 +21,9 @@ WORKDIR $ROOT
 COPY poetry.lock pyproject.toml ./
 RUN poetry install
 
-COPY . ./frontend
+COPY . ./client
 COPY wait-for-it.sh /usr/local/bin/wait-for-it.sh
 
 RUN chmod +x /usr/local/bin/wait-for-it.sh
 
-CMD ["wait-for-it.sh", "redis:6379", "--", "wait-for-it.sh", "api:8000", "--", "sh", "-c", "poetry run python frontend/main.py"]
+CMD ["wait-for-it.sh", "redis:6379", "--", "wait-for-it.sh", "api:8000", "--", "sh", "-c", "poetry run python client/main.py"]

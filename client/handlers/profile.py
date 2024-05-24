@@ -10,8 +10,11 @@ profile_router = Router()
 
 @profile_router.callback_query(F.data == "profile")
 async def profile(callback: CallbackQuery, bot_control: BotControl):
-    bot_control.set_context(Profile, bot_control.storage.first_name)
-    await bot_control.update_text_message(Profile(bot_control.storage.first_name))
+    bot_control.set_context(Profile, bot_control.storage.user_token, bot_control.storage.first_name)
+    await bot_control.update_text_message(await Profile(
+        bot_control.storage.user_token,
+        bot_control.storage.first_name
+    ).init())
 
 
 @profile_router.callback_query(F.data == "options")

@@ -1,11 +1,14 @@
 from datetime import datetime
+from typing import Any, List
 
-from sqlalchemy import update, insert, select, delete
+from sqlalchemy import update, insert, select, delete, and_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException
 
+
 from server.api.models import UserApiModel, UpdatePasswordApiModel
+from server.database import Session
 from server.database.models import UserORM, TargetORM, ServiceORM
 
 
@@ -102,7 +105,7 @@ class TargetsQueries:
         return [
             target.as_dict_()
             for target in (await session.execute(
-                select(TargetORM)
+                select(TargetORM).order_by(TargetORM.id)
                 .filter(TargetORM.user_id == user_id)
             )).scalars()
         ]
@@ -138,13 +141,18 @@ class TargetsQueries:
         return 1 if completed else 0
 
     @staticmethod
-    async def increase_progress(session: AsyncSession):
-        await session.execute(update(TargetORM).values({"progress": TargetORM.progress + 1}).filter(
-            TargetORM.progress + 1 <= TargetORM.border_progress, TargetORM.completed
-        ))
-        await session.execute(update(TargetORM).values({"completed": False}).filter(
-            TargetORM.progress != TargetORM.border_progress
-        ))
-        await session.execute(update(TargetORM).values({"completed_datetime": datetime.now()}).filter(
-            TargetORM.progress == TargetORM.border_progress, TargetORM.completed_datetime is None
-        ))
+    async def increase_progress():
+        async with Session.begin() as session:
+            await session.execute(update(TargetORM).values({"progress": TargetORM.progress + 1}).filter(
+                TargetORM.progress + 1 <= TargetORM.border_progress, TargetORM.completed
+            ))
+
+        async with Session.begin() as session:
+            await session.execute(update(TargetORM).values({"completed": False}).filter(
+                TargetORM.progress != TargetORM.border_progress
+            ))
+
+        async with Session.begin() as session:
+            await session.execute(update(TargetORM).values({"completed_datetime": datetime.now()}).filter(
+                and_(TargetORM.progress == TargetORM.border_progress, TargetORM.completed_datetime.is_(None))
+            ))

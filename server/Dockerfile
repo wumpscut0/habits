@@ -16,11 +16,11 @@ WORKDIR /app
 COPY pyproject.toml poetry.lock /app/
 RUN poetry install -n --only main
 
-COPY . backend/
+COPY . server/
 
 COPY wait-for-it.sh /usr/local/bin/wait-for-it.sh
 
 RUN chmod +x /usr/local/bin/wait-for-it.sh
 
-CMD wait-for-it.sh postgres:5432 -- sh -c "poetry run python backend/main.py"
+CMD wait-for-it.sh postgres:5432 -- sh -c "poetry run python server/main.py"
 

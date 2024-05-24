@@ -1,8 +1,10 @@
-from aiogram import Router
+from aiogram import Router, F
+from aiogram.filters import StateFilter
 from aiogram.types import Message
 
 from client.bot import BotControl, BotCommands
-from client.markups import Conform
+from client.bot.FSM import States
+from client.markups import Conform, Input, Info
 
 from client.markups.core import TextMessageMarkup, TextWidget
 from client.markups.specific import TitleScreen
@@ -33,8 +35,16 @@ async def exit_(message: Message, bot_control: BotControl):
 async def report(message: Message, bot_control: BotControl):
     await message.delete()
 
-    await bot_control.update_text_message(Conform(
-        f"Want to report a bug? {Emoji.BUG}\n"
-        f"Or leave ideas on how to improve functionality? {Emoji.SHINE_STAR}",
-        "send_message_to_admin",
+    await bot_control.update_text_message(Input(
+        f"Enter your message {Emoji.PENCIL}",
+        state=States.input_text_to_admin
+    ))
+
+
+@commands_router.message(StateFilter(States.input_text_to_admin), F.text)
+async def send_message_to_admin_accept_input(message: Message, bot_control: BotControl):
+    await bot_control.send_message_to_admin(message.text)
+    await message.delete()
+    await bot_control.update_text_message(Info(
+        f"Message sent {Emoji.INCOMING_ENVELOPE}"
     ))

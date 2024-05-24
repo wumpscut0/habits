@@ -61,5 +61,4 @@ async def invert_target_completed(target_id: int):
 
 @targets_router.patch('/progress')
 async def increase_targets_progress():
-    async with Session.begin() as session:
-        await TargetsQueries.increase_progress(session)
+    await TargetsQueries.increase_progress()

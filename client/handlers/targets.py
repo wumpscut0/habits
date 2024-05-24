@@ -8,8 +8,8 @@ from client.bot import BotControl
 from client.bot.FSM import States
 from client.markups import Input, Conform, Info
 
-from client.markups.specific import TargetsControl, CurrentTargetsListLeftCallbackData, CurrentTargetsList, \
-    CurrentTargetsListRightCallbackData, CurrentTargetCallbackData, Target, InputBorder
+from client.markups.specific import TargetsList, Target, InputBorder, TargetsLeftCallbackData, TargetsRightCallbackData, \
+    TargetCallbackData, CompletedTargetCallbackData, CompletedTarget
 from client.utils import config, Emoji
 from client.utils.scheduler import Scheduler
 
@@ -30,56 +30,56 @@ VERIFY_CODE_EXPIRATION = config.getint("limitations", "VERIFY_CODE_EXPIRATION")
 
 @targets_router.callback_query(F.data == "targets_control")
 async def targets_control(callback: CallbackQuery, bot_control: BotControl):
-    bot_control.set_context(TargetsControl, bot_control.storage.user_token)
-    await bot_control.update_text_message(await TargetsControl(bot_control.storage.user_token).init())
+    bot_control.set_context(TargetsList, bot_control.storage.user_token)
+    await bot_control.update_text_message(await TargetsList(bot_control.storage.user_token).init())
 
 
 @targets_router.callback_query(F.data == "current_targets")
 async def current_targets(callback: CallbackQuery, bot_control: BotControl):
-    bot_control.set_context(CurrentTargetsList, bot_control.storage.user_token)
-    await bot_control.update_text_message(await CurrentTargetsList(bot_control.storage.user_token).init())
+    bot_control.set_context(TargetsList, bot_control.storage.user_token)
+    await bot_control.update_text_message(await TargetsList(bot_control.storage.user_token).init())
 
 
-@targets_router.callback_query(CurrentTargetsListLeftCallbackData.filter())
+@targets_router.callback_query(TargetsLeftCallbackData.filter())
 async def current_targets_left(
         callback: CallbackQuery,
-        callback_data: CurrentTargetsListLeftCallbackData,
+        callback_data: TargetsLeftCallbackData,
         bot_control: BotControl
 ):
-    bot_control.set_context(CurrentTargetsList, bot_control.storage.user_token, callback_data.page)
-    await bot_control.update_text_message(await CurrentTargetsList(
+    bot_control.set_context(TargetsList, bot_control.storage.user_token, callback_data.page)
+    await bot_control.update_text_message(await TargetsList(
         bot_control.storage.user_token,
         callback_data.page
     ).init())
 
 
-@targets_router.callback_query(CurrentTargetsListRightCallbackData.filter())
+@targets_router.callback_query(TargetsRightCallbackData.filter())
 async def current_targets_right(
         callback: CallbackQuery,
-        callback_data: CurrentTargetsListRightCallbackData,
+        callback_data: TargetsRightCallbackData,
         bot_control: BotControl
 ):
-    bot_control.set_context(CurrentTargetsList, bot_control.storage.user_token, callback_data.page)
-    await bot_control.update_text_message(await CurrentTargetsList(
+    bot_control.set_context(TargetsList, bot_control.storage.user_token, callback_data.page)
+    await bot_control.update_text_message(await TargetsList(
         bot_control.storage.user_token,
         callback_data.page
     ).init())
 
 
-@targets_router.callback_query(CurrentTargetCallbackData.filter())
+@targets_router.callback_query(TargetCallbackData.filter())
 async def current_target(
         callback: CallbackQuery,
-        callback_data: CurrentTargetCallbackData,
+        callback_data: TargetCallbackData,
         bot_control: BotControl
 ):
     bot_control.storage.target_id = callback_data.id
     await bot_control.update_text_message(await Target(bot_control.storage.user_token, callback_data.id).init())
 
 
-@targets_router.callback_query(CurrentTargetCallbackData.filter())
+@targets_router.callback_query(TargetCallbackData.filter())
 async def current_target(
         callback: CallbackQuery,
-        callback_data: CurrentTargetCallbackData,
+        callback_data: TargetCallbackData,
         bot_control: BotControl
 ):
     bot_control.storage.target_id = callback_data.id
@@ -92,6 +92,14 @@ async def current_target(
         bot_control: BotControl
 ):
     await bot_control.update_text_message(await Target(bot_control.storage.user_token, bot_control.storage.target_id).init())
+
+
+@targets_router.callback_query(F.data == "completed_target")
+async def current_target(
+        callback: CallbackQuery,
+        bot_control: BotControl
+):
+    await bot_control.update_text_message(await CompletedTarget(bot_control.storage.user_token, bot_control.storage.target_id).init())
 
 
 @targets_router.callback_query(F.data == "invert_completed")
@@ -181,6 +189,16 @@ async def input_text_update_target_description(message: Message, bot_control: Bo
         await bot_control.update_text_message(await Target(token, target_id).init())
 
 
+@targets_router.callback_query(F.data == "delete_completed_target")
+async def delete_target(callback: CallbackQuery, bot_control: BotControl):
+    await bot_control.update_text_message(Conform(
+        f"Do you really want to delete this target forever? {Emoji.WARNING}",
+        "conform_delete_target",
+        no_callback_data="completed_target"
+    ))
+    await Scheduler.refresh_notifications(bot_control.user_id)
+
+
 @targets_router.callback_query(F.data == "delete_target")
 async def delete_target(callback: CallbackQuery, bot_control: BotControl):
     await bot_control.update_text_message(Conform(
@@ -196,7 +214,7 @@ async def conform_delete_target(callback: CallbackQuery, bot_control: BotControl
     _, code = await bot_control.api.delete_target(bot_control.storage.user_token, bot_control.storage.target_id)
     if await bot_control.api_status_code_processing(code, 200):
         await bot_control.update_text_message(Info(
-            f"Target deleted {Emoji.OK}"
+            f"Target deleted {Emoji.FALLEN_LEAF}"
         ))
 
 
@@ -291,7 +309,7 @@ async def input_text_target_border(message: Message, bot_control: BotControl):
     if await bot_control.api_status_code_processing(code, 201):
         await Scheduler.refresh_notifications(bot_control.user_id)
         await bot_control.update_text_message(Info(
-            f"Target created {Emoji.OK}"
+            f"Target created {Emoji.SPROUT}"
         ))
 
 
@@ -308,3 +326,11 @@ async def conform_create_target(callback: CallbackQuery, bot_control: BotControl
         await bot_control.update_text_message(Info(
             f"Target created {Emoji.OK}"
         ))
+
+
+@targets_router.callback_query(CompletedTargetCallbackData.filter())
+async def completed_target(callback: CallbackQuery, callback_data: CompletedTargetCallbackData, bot_control: BotControl):
+    await bot_control.update_text_message(await CompletedTarget(
+        bot_control.storage.user_token,
+        callback_data.id
+    ).init())

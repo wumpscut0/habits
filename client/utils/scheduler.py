@@ -19,7 +19,7 @@ HOUR_INCREASE_PROGRESS = config.getint("limitations", "HOUR_INCREASE_PROGRESS")
 
 class Scheduler:
     _jobstores = {
-        'default': RedisJobStore(db=2)
+        'default': RedisJobStore(db=2, host=os.getenv("REDIS_HOST"))
     }
     _job_defaults = {
         'coalesce': False,
