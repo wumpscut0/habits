@@ -24,7 +24,7 @@ services:
     build:
       context: client
     environment:
-      TOKEN: 6943554911:AAFbCJZH2U9K2zTBJ5EvDuiX1OYQ-Kkf-Oo
+      TOKEN: my_token
       JWT: 9565157d0e36f3e9c1c334666899186f3d1aaa5b3fbee105412c4344cd83b1e8
       SMTP_PASSWORD: my_smtp_password
       ORGANIZATION_EMAIL: my_email
