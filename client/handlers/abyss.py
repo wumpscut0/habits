@@ -13,13 +13,15 @@ abyss_router = Router()
 
 @abyss_router.callback_query()
 async def callback_abyss(callback: CallbackQuery, bot_control: BotControl):
-    await bot_control.update_text_message(Info(
-        f"Sorry. This button no working so far. {Emoji.CRYING_CAT}"
-    ))
+    await bot_control.update_text_message(
+        Info(f"Sorry. This button no working so far. {Emoji.CRYING_CAT}")
+    )
 
 
 @abyss_router.message(~StateFilter(None))
-async def wrong_type_message_abyss(message: Message, bot_control: BotControl, state: FSMContext):
+async def wrong_type_message_abyss(
+    message: Message, bot_control: BotControl, state: FSMContext
+):
     await message.delete()
 
     state_name = await state.get_state()
@@ -39,4 +41,6 @@ async def wrong_type_message_abyss(message: Message, bot_control: BotControl, st
 @abyss_router.message()
 async def message_abyss(message: Message, bot_control: BotControl):
     await message.delete()
-    await bot_control.create_text_message(Info(f"Your message was eaten by the abyss {Emoji.YUM}"))
+    await bot_control.create_text_message(
+        Info(f"Your message was eaten by the abyss {Emoji.YUM}")
+    )

@@ -17,12 +17,14 @@ from server.utils import config
 
 oauth2_schema = OAuth2PasswordBearer(tokenUrl="users/login")
 
-ACCESS_TOKEN_EXPIRE_MINUTES = config.getint("limitations", "ACCESS_TOKEN_EXPIRE_MINUTES")
+ACCESS_TOKEN_EXPIRE_MINUTES = config.getint(
+    "limitations", "ACCESS_TOKEN_EXPIRE_MINUTES"
+)
 
 
 class Authority:
     _jwt_algorithm = "HS256"
-    _cipher = Fernet(os.getenv('CIPHER'))
+    _cipher = Fernet(os.getenv("CIPHER"))
 
     @classmethod
     async def decrypt_message(cls, data: bytes | str):
@@ -38,7 +40,9 @@ class Authority:
     @classmethod
     async def _decode_jwt(cls, token: str):
         try:
-            return jwt.decode(token, key=os.getenv('JWT'), algorithms=cls._jwt_algorithm)
+            return jwt.decode(
+                token, key=os.getenv("JWT"), algorithms=cls._jwt_algorithm
+            )
         except jwt.PyJWTError:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -54,7 +58,12 @@ class Authority:
     async def user_authenticate(cls, auth_api_model: AuthApiModel):
         async with Session.begin() as session:
             user = await UserQueries.get_user(session, auth_api_model.user_id)
-            if user is None or (user.get("hash") is not None and not await cls._verify_password(auth_api_model.password, user.get("hash"))):
+            if user is None or (
+                user.get("hash") is not None
+                and not await cls._verify_password(
+                    auth_api_model.password, user.get("hash")
+                )
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Incorrect user id or api key",
@@ -62,8 +71,10 @@ class Authority:
                 )
         expire = datetime.now() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         return Token(
-            access_token=cls._encode_jwt({"sub": auth_api_model.user_id, "exp": expire}),
-            token_type="bearer"
+            access_token=cls._encode_jwt(
+                {"sub": auth_api_model.user_id, "exp": expire}
+            ),
+            token_type="bearer",
         )
 
     @classmethod
@@ -75,7 +86,9 @@ class Authority:
         return payload
 
     @classmethod
-    async def authenticate_service(cls, x_service_name: Annotated[str, Header()], api_key: Annotated[str, Header()]):
+    async def authenticate_service(
+        cls, x_service_name: Annotated[str, Header()], api_key: Annotated[str, Header()]
+    ):
         async with Session.begin() as session:
             service = await ServiceQueries.get_service(session, x_service_name)
         if service is None or service.api_key != api_key:

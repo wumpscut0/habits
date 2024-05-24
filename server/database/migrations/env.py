@@ -11,15 +11,16 @@ from alembic import context
 from server.database.models import Base
 
 from dotenv import load_dotenv, find_dotenv
+
 load_dotenv(find_dotenv())
 
 config = configparser.ConfigParser()
 
 config.read(os.path.abspath(os.path.join(os.path.dirname(__file__), "../alembic.ini")))
 
-config.set('alembic', 'sqlalchemy.url', os.getenv("DATABASE") + '/habits')
+config.set("alembic", "sqlalchemy.url", os.getenv("DATABASE") + "/habits")
 
-with open('alembic.ini', 'w') as configfile:
+with open("alembic.ini", "w") as configfile:
     config.write(configfile)
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

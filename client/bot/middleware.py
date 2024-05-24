@@ -15,7 +15,7 @@ class BuildBotControl(BaseMiddleware):
         self,
         handler: Callable[[Update, Dict[str, Any]], Awaitable[Any]],
         event: Update,
-        data: Dict[str, Any]
+        data: Dict[str, Any],
     ) -> Any:
         bot_control = await self._build_bot_control(event, data["state"])
         data["bot_control"] = bot_control
@@ -23,8 +23,12 @@ class BuildBotControl(BaseMiddleware):
             return await handler(event, data)
         except BaseException as e:
             errors.critical(f"An error occurred when execution some handler:\n{e}")
-            await bot_control.update_text_message(Info(f"Something went wrong {Emoji.CRYING_CAT + Emoji.BROKEN_HEARTH}"
-                                                       f" Sorry"))
+            await bot_control.update_text_message(
+                Info(
+                    f"Something went wrong {Emoji.CRYING_CAT + Emoji.BROKEN_HEARTH}"
+                    f" Sorry"
+                )
+            )
             raise e
 
     @classmethod

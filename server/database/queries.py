@@ -22,11 +22,15 @@ class UserQueries:
     @staticmethod
     async def registration(session: AsyncSession, user_api_model: UserApiModel):
         try:
-            await session.execute(insert(UserORM).values({
-                "id": user_api_model.user_id,
-                "hash": user_api_model.hash,
-                "email": user_api_model.email,
-            }))
+            await session.execute(
+                insert(UserORM).values(
+                    {
+                        "id": user_api_model.user_id,
+                        "hash": user_api_model.hash,
+                        "email": user_api_model.email,
+                    }
+                )
+            )
         except IntegrityError:
             raise HTTPException(409, "User already exists")
 
@@ -47,54 +51,85 @@ class UserQueries:
 
 class PasswordQueries:
     @staticmethod
-    async def update_password(session: AsyncSession, update_password_api_model: UpdatePasswordApiModel):
-        await session.execute(update(UserORM)
-                              .where(UserORM.id == update_password_api_model.user_id)
-                              .values({"hash": update_password_api_model.hash}))
+    async def update_password(
+        session: AsyncSession, update_password_api_model: UpdatePasswordApiModel
+    ):
+        await session.execute(
+            update(UserORM)
+            .where(UserORM.id == update_password_api_model.user_id)
+            .values({"hash": update_password_api_model.hash})
+        )
 
     @staticmethod
     async def delete_password(session: AsyncSession, user_id: str):
-        await session.execute(update(UserORM).where(UserORM.id == user_id).values({"hash": None}))
+        await session.execute(
+            update(UserORM).where(UserORM.id == user_id).values({"hash": None})
+        )
 
 
 class EmailQueries:
     @staticmethod
     async def update(session: AsyncSession, user_id: str, email: str):
-        await session.execute(update(UserORM).where(UserORM.id == user_id).values({"email": email}))
+        await session.execute(
+            update(UserORM).where(UserORM.id == user_id).values({"email": email})
+        )
 
     @staticmethod
     async def delete(session: AsyncSession, user_id: str):
-        await session.execute(update(UserORM).where(UserORM.id == user_id).values({"email": None}))
+        await session.execute(
+            update(UserORM).where(UserORM.id == user_id).values({"email": None})
+        )
 
 
 class NotificationsQueries:
     @staticmethod
     async def on(session: AsyncSession, user_id: str):
-        return (await session.execute(select(UserORM.notifications).where(UserORM.id == user_id))).scalar()
+        return (
+            await session.execute(
+                select(UserORM.notifications).where(UserORM.id == user_id)
+            )
+        ).scalar()
 
     @staticmethod
     async def update(session: AsyncSession, user_id: str, time):
-        await session.execute(update(UserORM).values({"notification_time": time}).where(
-            UserORM.id == user_id))
+        await session.execute(
+            update(UserORM)
+            .values({"notification_time": time})
+            .where(UserORM.id == user_id)
+        )
 
     @staticmethod
     async def invert(session: AsyncSession, user_id: str):
-        notifications = (await session.execute(select(UserORM.notifications).where(UserORM.id == user_id))).scalar()
-        await session.execute(update(UserORM).where(UserORM.id == user_id).values({"notifications": not notifications}))
+        notifications = (
+            await session.execute(
+                select(UserORM.notifications).where(UserORM.id == user_id)
+            )
+        ).scalar()
+        await session.execute(
+            update(UserORM)
+            .where(UserORM.id == user_id)
+            .values({"notifications": not notifications})
+        )
         return 0 if notifications else 1
 
 
 class TargetsQueries:
     @staticmethod
     async def create(
-            session: AsyncSession,
-            user_id: str,
-            name: str,
-            description: str | None = None,
-            border_progress: int | None = None
+        session: AsyncSession,
+        user_id: str,
+        name: str,
+        description: str | None = None,
+        border_progress: int | None = None,
     ):
-        await session.execute(insert(TargetORM).values(
-            user_id=user_id, name=name, description=description, border_progress=border_progress))
+        await session.execute(
+            insert(TargetORM).values(
+                user_id=user_id,
+                name=name,
+                description=description,
+                border_progress=border_progress,
+            )
+        )
 
     @staticmethod
     async def delete(session: AsyncSession, target_id: int):
@@ -104,10 +139,13 @@ class TargetsQueries:
     async def get_targets(session: AsyncSession, user_id: str):
         return [
             target.as_dict_()
-            for target in (await session.execute(
-                select(TargetORM).order_by(TargetORM.id)
-                .filter(TargetORM.user_id == user_id)
-            )).scalars()
+            for target in (
+                await session.execute(
+                    select(TargetORM)
+                    .order_by(TargetORM.id)
+                    .filter(TargetORM.user_id == user_id)
+                )
+            ).scalars()
         ]
 
     @staticmethod
@@ -121,21 +159,20 @@ class TargetsQueries:
     async def update(session: AsyncSession, target_id: int, **kwargs):
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         await session.execute(
-            update(TargetORM)
-            .values(kwargs)
-            .filter(TargetORM.id == target_id)
+            update(TargetORM).values(kwargs).filter(TargetORM.id == target_id)
         )
 
     @staticmethod
     async def invert_completed(session: AsyncSession, target_id: int):
-        completed = (await session.execute(
-            select(TargetORM.completed)
-            .filter(TargetORM.id == target_id)
-        )).scalar()
+        completed = (
+            await session.execute(
+                select(TargetORM.completed).filter(TargetORM.id == target_id)
+            )
+        ).scalar()
 
         await session.execute(
             update(TargetORM)
-            .values({'completed': not completed})
+            .values({"completed": not completed})
             .filter(TargetORM.id == target_id)
         )
         return 1 if completed else 0
@@ -143,16 +180,30 @@ class TargetsQueries:
     @staticmethod
     async def increase_progress():
         async with Session.begin() as session:
-            await session.execute(update(TargetORM).values({"progress": TargetORM.progress + 1}).filter(
-                TargetORM.progress + 1 <= TargetORM.border_progress, TargetORM.completed
-            ))
+            await session.execute(
+                update(TargetORM)
+                .values({"progress": TargetORM.progress + 1})
+                .filter(
+                    TargetORM.progress + 1 <= TargetORM.border_progress,
+                    TargetORM.completed,
+                )
+            )
 
         async with Session.begin() as session:
-            await session.execute(update(TargetORM).values({"completed": False}).filter(
-                TargetORM.progress != TargetORM.border_progress
-            ))
+            await session.execute(
+                update(TargetORM)
+                .values({"completed": False})
+                .filter(TargetORM.progress != TargetORM.border_progress)
+            )
 
         async with Session.begin() as session:
-            await session.execute(update(TargetORM).values({"completed_datetime": datetime.now()}).filter(
-                and_(TargetORM.progress == TargetORM.border_progress, TargetORM.completed_datetime.is_(None))
-            ))
+            await session.execute(
+                update(TargetORM)
+                .values({"completed_datetime": datetime.now()})
+                .filter(
+                    and_(
+                        TargetORM.progress == TargetORM.border_progress,
+                        TargetORM.completed_datetime.is_(None),
+                    )
+                )
+            )

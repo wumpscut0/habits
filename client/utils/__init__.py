@@ -75,13 +75,13 @@ config.read(os.path.abspath(os.path.join(os.path.dirname(__file__), "config.ini"
 
 
 def create_progress_text(
-        divisible: int,
-        divider: int,
-        *,
-        progress_element: str = Emoji.GREEN_BIG_SQUARE,
-        remaining_element: str = Emoji.GREY_BUG_SQUARE,
-        length_widget: int = 10,
-        show_digits: bool = True
+    divisible: int,
+    divider: int,
+    *,
+    progress_element: str = Emoji.GREEN_BIG_SQUARE,
+    remaining_element: str = Emoji.GREY_BUG_SQUARE,
+    length_widget: int = 10,
+    show_digits: bool = True,
 ):
     if divisible > divider:
         percent = 100

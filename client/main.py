@@ -12,5 +12,5 @@ async def main():
     await dispatcher.start_polling(BotControl.bot)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(main())

@@ -1,16 +1,22 @@
 from aiogram.filters.callback_data import CallbackData
 
 from client.bot.FSM import States
-from client.markups.core import TextMessageMarkup, ButtonWidget, TextWidget, InitializeMarkupInterface, DataTextWidget
+from client.markups.core import (
+    TextMessageMarkup,
+    ButtonWidget,
+    TextWidget,
+    InitializeMarkupInterface,
+    DataTextWidget,
+)
 from client.utils import Emoji
 
 
 class Info(InitializeMarkupInterface):
     def __init__(
-            self,
-            text: str,
-            ok_text: str = "Ok",
-            back_callback_data: str | CallbackData = "return_to_context"
+        self,
+        text: str,
+        ok_text: str = "Ok",
+        back_callback_data: str | CallbackData = "return_to_context",
     ):
         super().__init__()
         self.info = TextWidget(text=text)
@@ -21,7 +27,11 @@ class Info(InitializeMarkupInterface):
 
 
 class Temp(InitializeMarkupInterface):
-    def __init__(self, text: str = f"{Emoji.HOURGLASS_START} Processing...", state: States | None = None):
+    def __init__(
+        self,
+        text: str = f"{Emoji.HOURGLASS_START} Processing...",
+        state: States | None = None,
+    ):
         super().__init__(state)
         self.temp = TextWidget(text=text)
 
@@ -29,7 +39,12 @@ class Temp(InitializeMarkupInterface):
 
 
 class Back(InitializeMarkupInterface):
-    def __init__(self, *, text: str = f"{Emoji.BACK} Back", callback_data: str | CallbackData = "return_to_context"):
+    def __init__(
+        self,
+        *,
+        text: str = f"{Emoji.BACK} Back",
+        callback_data: str | CallbackData = "return_to_context",
+    ):
         super().__init__()
         self.back = ButtonWidget(text=text, callback_data=callback_data)
 
@@ -45,21 +60,18 @@ class LeftRight(InitializeMarkupInterface):
         left_text: str = f"{Emoji.LEFT}",
         right_text: str = f"{Emoji.RIGHT}",
         left_mark: str = "",
-        right_mark: str = ""
+        right_mark: str = "",
     ):
         super().__init__()
         self.left = ButtonWidget(
-            text=left_text,
-            mark=left_mark,
-            sep="",
-            callback_data=left_callback_data
+            text=left_text, mark=left_mark, sep="", callback_data=left_callback_data
         )
         self.right = ButtonWidget(
             text=right_text,
             mark=right_mark,
             mark_left=False,
             sep="",
-            callback_data=right_callback_data
+            callback_data=right_callback_data,
         )
 
         self.text_message_markup.add_buttons_in_new_row(self.left, self.right)
@@ -85,7 +97,7 @@ class LeftBackRight(InitializeMarkupInterface):
             left_text=left_text,
             right_text=right_text,
             left_mark=left_mark,
-            right_mark=right_mark
+            right_mark=right_mark,
         )
         self.back = Back(text=back_text, callback_data=back_callback_data)
 
@@ -98,12 +110,12 @@ class LeftBackRight(InitializeMarkupInterface):
 
 class Input(InitializeMarkupInterface):
     def __init__(
-            self,
-            text: str,
-            *,
-            back_text: str = f"{Emoji.DENIAL} Cancel",
-            back_callback_data: str | CallbackData = "return_to_context",
-            state: States | None = None
+        self,
+        text: str,
+        *,
+        back_text: str = f"{Emoji.DENIAL} Cancel",
+        back_callback_data: str | CallbackData = "return_to_context",
+        state: States | None = None,
     ):
         super().__init__(state)
         self.info = TextWidget(text=text)
@@ -115,13 +127,13 @@ class Input(InitializeMarkupInterface):
 
 class Conform(InitializeMarkupInterface):
     def __init__(
-            self,
-            text: str,
-            yes_callback_data: str | CallbackData,
-            *,
-            yes_text: str = f"{Emoji.OK} Yes",
-            no_text: str = f"{Emoji.DENIAL} No",
-            no_callback_data: str | CallbackData = "return_to_context"
+        self,
+        text: str,
+        yes_callback_data: str | CallbackData,
+        *,
+        yes_text: str = f"{Emoji.OK} Yes",
+        no_text: str = f"{Emoji.DENIAL} No",
+        no_callback_data: str | CallbackData = "return_to_context",
     ):
         super().__init__()
         self.yes = ButtonWidget(text=yes_text, callback_data=yes_callback_data)
@@ -133,9 +145,9 @@ class Conform(InitializeMarkupInterface):
 
 class ErrorInfo(InitializeMarkupInterface):
     def __init__(
-            self,
-            text: str = f"Error during data loading {Emoji.CRYING_CAT + Emoji.BROKEN_HEARTH} Sorry",
-            callback_data: str | CallbackData = "return_to_context"
+        self,
+        text: str = f"Error during data loading {Emoji.CRYING_CAT + Emoji.BROKEN_HEARTH} Sorry",
+        callback_data: str | CallbackData = "return_to_context",
     ):
         super().__init__()
         self.text_message_markup.attach(Info(text))

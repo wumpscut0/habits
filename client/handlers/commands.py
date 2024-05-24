@@ -35,16 +35,15 @@ async def exit_(message: Message, bot_control: BotControl):
 async def report(message: Message, bot_control: BotControl):
     await message.delete()
 
-    await bot_control.update_text_message(Input(
-        f"Enter your message {Emoji.PENCIL}",
-        state=States.input_text_to_admin
-    ))
+    await bot_control.update_text_message(
+        Input(f"Enter your message {Emoji.PENCIL}", state=States.input_text_to_admin)
+    )
 
 
 @commands_router.message(StateFilter(States.input_text_to_admin), F.text)
 async def send_message_to_admin_accept_input(message: Message, bot_control: BotControl):
     await bot_control.send_message_to_admin(message.text)
     await message.delete()
-    await bot_control.update_text_message(Info(
-        f"Message sent {Emoji.INCOMING_ENVELOPE}"
-    ))
+    await bot_control.update_text_message(
+        Info(f"Message sent {Emoji.INCOMING_ENVELOPE}")
+    )

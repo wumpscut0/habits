@@ -39,7 +39,16 @@ class CustomRedis(Redis):
         pxat: Union[AbsExpiryT, None] = None,
     ) -> ResponseT:
         return super().set(
-            name, pickle.dumps(value), ex, px, nx, xx, keepttl, get, exat, pxat,
+            name,
+            pickle.dumps(value),
+            ex,
+            px,
+            nx,
+            xx,
+            keepttl,
+            get,
+            exat,
+            pxat,
         )
 
     def get(self, name: KeyT) -> ResponseT:
@@ -49,7 +58,9 @@ class CustomRedis(Redis):
 
     def setex(self, name: KeyT, time: ExpiryT, value: Any) -> ResponseT:
         return super().setex(
-            name, time, pickle.dumps(value),
+            name,
+            time,
+            pickle.dumps(value),
         )
 
     def getex(
@@ -67,7 +78,9 @@ class CustomRedis(Redis):
 
 
 class Storage:
-    storage = CustomRedis(host=os.getenv("REDIS_HOST"), port=int(os.getenv("REDIS_PORT")), db=1)
+    storage = CustomRedis(
+        host=os.getenv("REDIS_HOST"), port=int(os.getenv("REDIS_PORT")), db=1
+    )
 
     def __init__(self, user_id):
         self.user_id = user_id

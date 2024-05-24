@@ -24,7 +24,11 @@ class CallbackPrivateFilter:
         return callback.message.chat.type == "private"
 
 
-dispatcher = Dispatcher(storage=RedisStorage(Redis(host=os.getenv("REDIS_HOST"), port=int(os.getenv("REDIS_PORT")))))
+dispatcher = Dispatcher(
+    storage=RedisStorage(
+        Redis(host=os.getenv("REDIS_HOST"), port=int(os.getenv("REDIS_PORT")))
+    )
+)
 dispatcher.update.middleware(BuildBotControl())
 dispatcher.message.filter(MessagePrivateFilter())
 dispatcher.callback_query.filter(CallbackPrivateFilter())
@@ -37,5 +41,3 @@ dispatcher.include_routers(
     targets_router,
     abyss_router,
 )
-
-

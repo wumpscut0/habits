@@ -12,7 +12,7 @@ config = ConfigParser()
 
 config.read(os.path.abspath(os.path.join(os.path.dirname(__file__), "alembic.ini")))
 
-engine = create_async_engine(os.getenv('DATABASE') + '/habits')
+engine = create_async_engine(os.getenv("DATABASE") + "/habits")
 Session = async_sessionmaker(engine, expire_on_commit=False)
 
 

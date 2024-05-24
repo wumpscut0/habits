@@ -13,7 +13,7 @@ app.include_router(users_router)
 app.include_router(targets_router)
 
 
-@app.middleware('http')
+@app.middleware("http")
 async def error_abyss(request: Request, call_next):
     try:
         return await call_next(request)

@@ -17,38 +17,33 @@ from client.utils.redis import Storage
 
 class BotCommands:
     bot_commands = [
+        BotCommand(command="/start", description=f"Get title screen {Emoji.ZAP}"),
+        BotCommand(command="/exit", description=f"Close interface {Emoji.ZZZ}"),
         BotCommand(
-            command="/start",
-            description=f"Get title screen {Emoji.ZAP}"
-        ),
-        BotCommand(
-            command="/exit",
-            description=f"Close interface {Emoji.ZZZ}"
-        ),
-        BotCommand(
-            command="/report",
-            description=f"Send report {Emoji.BUG + Emoji.SHINE_STAR}"
+            command="/report", description=f"Send report {Emoji.BUG + Emoji.SHINE_STAR}"
         ),
     ]
 
     @classmethod
     def start(cls):
-        return Command(cls.bot_commands[0].command.lstrip('/'))
+        return Command(cls.bot_commands[0].command.lstrip("/"))
 
     @classmethod
     def exit(cls):
-        return Command(cls.bot_commands[1].command.lstrip('/'))
+        return Command(cls.bot_commands[1].command.lstrip("/"))
 
     @classmethod
     def report(cls):
-        return Command(cls.bot_commands[2].command.lstrip('/'))
+        return Command(cls.bot_commands[2].command.lstrip("/"))
 
 
 class BotControl:
-    bot = Bot(os.getenv('TOKEN'), parse_mode='HTML')
+    bot = Bot(os.getenv("TOKEN"), parse_mode="HTML")
     api = Api
 
-    def __init__(self, user_id: int, state: FSMContext | None = None, contextualize: bool = True):
+    def __init__(
+        self, user_id: int, state: FSMContext | None = None, contextualize: bool = True
+    ):
         self._user_id = user_id
         self._state = state
         self.storage = Storage(user_id)
@@ -67,14 +62,18 @@ class BotControl:
         # We can abstract from multitude callbacks.
         return self.storage.context
 
-    def set_context(self, initializer: type[InitializeMarkupInterface], *args, **kwargs):
+    def set_context(
+        self, initializer: type[InitializeMarkupInterface], *args, **kwargs
+    ):
         self.storage.context = initializer, args, kwargs
 
     async def create_text_message(
-            self,
-            text_message_markup: TextMessageMarkup | InitializeMarkupInterface
+        self, text_message_markup: TextMessageMarkup | InitializeMarkupInterface
     ):
-        if isinstance(text_message_markup, (InitializeMarkupInterface, AsyncInitializeMarkupInterface)):
+        if isinstance(
+            text_message_markup,
+            (InitializeMarkupInterface, AsyncInitializeMarkupInterface),
+        ):
             text_message_markup = text_message_markup.text_message_markup
 
         # if self.contextualize:
@@ -87,7 +86,7 @@ class BotControl:
             message = await self.bot.send_message(
                 chat_id=self._user_id,
                 text=text_message_markup.text,
-                reply_markup=text_message_markup.keyboard
+                reply_markup=text_message_markup.keyboard,
             )
             self.storage.add_message_id_to_the_pull(message.message_id)
         except TelegramBadRequest:
@@ -96,10 +95,13 @@ class BotControl:
     #  This is central operation with bot.
     #  It magic method wanting only special TextMessageMarkup instance for smart update chat dialog in text message case
     async def update_text_message(
-            self,
-            text_message_markup: TextMessageMarkup | InitializeMarkupInterface,
+        self,
+        text_message_markup: TextMessageMarkup | InitializeMarkupInterface,
     ):
-        if isinstance(text_message_markup, (InitializeMarkupInterface, AsyncInitializeMarkupInterface)):
+        if isinstance(
+            text_message_markup,
+            (InitializeMarkupInterface, AsyncInitializeMarkupInterface),
+        ):
             text_message_markup = text_message_markup.text_message_markup
 
         if self.contextualize:
@@ -120,7 +122,7 @@ class BotControl:
                 chat_id=self._user_id,
                 message_id=last_message_id,
                 text=text_message_markup.text,
-                reply_markup=text_message_markup.keyboard
+                reply_markup=text_message_markup.keyboard,
             )
         except TelegramBadRequest:
             await self.delete_message(last_message_id)
@@ -133,12 +135,16 @@ class BotControl:
             if InitializeMarkupInterface in initializer.__bases__:
                 await self.update_text_message(initializer(*args, **kwargs))
             elif AsyncInitializeMarkupInterface in initializer.__bases__:
-                await self.update_text_message(await initializer(*args, **kwargs).init())
+                await self.update_text_message(
+                    await initializer(*args, **kwargs).init()
+                )
             else:
-                errors.critical(f"Incorrect initializer in context.\n"
-                                f"Initializer: {initializer}\n"
-                                f"Args: {args}"
-                                f"Kwargs: {kwargs}")
+                errors.critical(
+                    f"Incorrect initializer in context.\n"
+                    f"Initializer: {initializer}\n"
+                    f"Args: {args}"
+                    f"Kwargs: {kwargs}"
+                )
                 raise ValueError
         except (AttributeError, ValueError, BaseException) as e:
             # If we change code with context in redis, then exist chance work this exception
@@ -149,13 +155,9 @@ class BotControl:
             )
 
     async def send_message_to_admin(self, message: str):
-        message = (f"Reply from {self.storage.first_name}\n"
-                   f"{message}")
+        message = f"Reply from {self.storage.first_name}\n" f"{message}"
         try:
-            await self.bot.send_message(
-                chat_id=os.getenv("GROUP_ID"),
-                text=message
-            )
+            await self.bot.send_message(chat_id=os.getenv("GROUP_ID"), text=message)
         except TelegramBadRequest as e:
             errors.error(f"Failed sending message to admin: {message}\n{e}")
 
@@ -187,19 +189,23 @@ class BotControl:
         if code == 401:
             info.warning(f"Trying unauthorized access. User: {self.user_id}")
             self.set_context(TitleScreen, self.user_id)
-            await self.update_text_message(Info(
-                f"Your session expired {Emoji.CRYING_CAT} Please, sign in again {Emoji.DOOR}"
-            ))
+            await self.update_text_message(
+                Info(
+                    f"Your session expired {Emoji.CRYING_CAT} Please, sign in again {Emoji.DOOR}"
+                )
+            )
 
         elif code == 500:
             errors.critical(f"Internal server error.")
-            await self.update_text_message(Info(
-                f"Internal server error {Emoji.CRYING_CAT + Emoji.BROKEN_HEARTH} Sorry"
-            ))
+            await self.update_text_message(
+                Info(
+                    f"Internal server error {Emoji.CRYING_CAT + Emoji.BROKEN_HEARTH} Sorry"
+                )
+            )
         else:
             errors.critical(f"Unexpected status from API: {code}")
-            await self.update_text_message(Info(
-                f"Something broken {Emoji.CRYING_CAT + Emoji.BROKEN_HEARTH} Sorry"
-            ))
+            await self.update_text_message(
+                Info(f"Something broken {Emoji.CRYING_CAT + Emoji.BROKEN_HEARTH} Sorry")
+            )
 
         return False

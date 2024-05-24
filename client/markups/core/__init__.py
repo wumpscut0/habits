@@ -35,10 +35,10 @@ class TextWidget:
     def __init__(
         self,
         *,
-        mark: str = '',
+        mark: str = "",
         text: str = Emoji.BAN,
         mark_left: bool = True,
-        sep: str = ' '
+        sep: str = " ",
     ):
         self.mark = mark
         self._text = text
@@ -63,13 +63,13 @@ class TextWidget:
 
 class DataTextWidget(TextWidget):
     def __init__(
-            self,
-            *,
-            mark: str = '',
-            text: str = Emoji.BAN,
-            data: str = Emoji.GREY_QUESTION,
-            sep: str = ': ',
-            end: str = '',
+        self,
+        *,
+        mark: str = "",
+        text: str = Emoji.BAN,
+        data: str = Emoji.GREY_QUESTION,
+        sep: str = ": ",
+        end: str = "",
     ):
         super().__init__(
             mark=mark,
@@ -86,12 +86,13 @@ class DataTextWidget(TextWidget):
 
 class ButtonWidget:
     def __init__(
-            self, *,
-            mark: str = '',
-            text: str = None,
-            mark_left: bool = True,
-            sep: str = ' ',
-            callback_data: str | CallbackData = Emoji.BAN
+        self,
+        *,
+        mark: str = "",
+        text: str = None,
+        mark_left: bool = True,
+        sep: str = " ",
+        callback_data: str | CallbackData = Emoji.BAN,
     ):
         self.mark = mark
         self._text = text
@@ -146,6 +147,7 @@ class KeyboardMarkup:
     Max telegram inline keyboard buttons row is 8.
      add_button(s)_in_last_row will automatically move the button to the new row
     """
+
     _limitation_row = 8
 
     def __init__(self, map_: List[List[ButtonWidget]] | None = None):
