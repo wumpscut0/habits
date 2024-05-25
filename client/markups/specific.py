@@ -221,7 +221,7 @@ class Options(AsyncInitializeMarkupInterface):
         )
         local_time = DataTextWidget(
             text=f"{Emoji.WATCH} Server time",
-            data=f"{datetime.now().strftime('%d.%m.%y %H:%M')} UTC{time.tzname[0]}",
+            data=f"{datetime.now().strftime('%d.%m.%y %H:%M')} {''.join(time.tzname)}",
         )
         time_ = DataTextWidget(text=f"{Emoji.BELL} Notification time")
         delete_password = ButtonWidget(
