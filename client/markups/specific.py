@@ -216,7 +216,7 @@ class Options(AsyncInitializeMarkupInterface):
     async def init(self):
         info = DataTextWidget(
             text=f"{Emoji.INFO} Progress for each target every day will be increased at",
-            data=f"{HOUR_INCREASE_PROGRESS.zfill(2)}:{MINUTE_INCREASE_PROGRESS.zfill(2)}",
+            data=f"{HOUR_INCREASE_PROGRESS.zfill(2)}:UTC+07",
             sep=" ",
         )
         local_time = DataTextWidget(
